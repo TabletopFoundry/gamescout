@@ -1,47 +1,16 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
-
-interface Game {
-  id: number;
-  name: string;
-  year: number;
-  min_players: number;
-  max_players: number;
-  min_playtime: number;
-  max_playtime: number;
-  complexity: number;
-  bgg_rating: number;
-  categories: string[];
-  thumbnail_url: string;
-}
+import { useState, useEffect } from "react";
+import type { Game, CollectionStatus } from "@/types";
+import { getComplexityLabel, getComplexityColor } from "@/types";
 
 interface GameCardProps {
   game: Game;
   reason?: string;
-  collectionStatus?: "owned" | "wishlist" | null;
-  onCollectionChange?: (gameId: number, status: "owned" | "wishlist" | null) => void;
+  collectionStatus?: CollectionStatus;
+  onCollectionChange?: (gameId: number, status: CollectionStatus) => void;
   size?: "sm" | "md" | "lg";
-}
-
-const COMPLEXITY_LABELS: Record<string, string> = {
-  "1": "Light",
-  "2": "Medium-Light",
-  "3": "Medium",
-  "4": "Medium-Heavy",
-  "5": "Heavy",
-};
-
-function getComplexityLabel(c: number) {
-  return COMPLEXITY_LABELS[String(Math.round(c))] || "Medium";
-}
-
-function getComplexityColor(c: number) {
-  if (c < 2) return "text-emerald-400";
-  if (c < 3) return "text-yellow-400";
-  if (c < 4) return "text-orange-400";
-  return "text-red-400";
 }
 
 export default function GameCard({
@@ -52,30 +21,39 @@ export default function GameCard({
   size = "md",
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
-  const [status, setStatus] = useState<"owned" | "wishlist" | null>(
+  const [status, setStatus] = useState<CollectionStatus>(
     collectionStatus ?? null
   );
   const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Sync status when prop changes (S1 fix)
+  useEffect(() => {
+    setStatus(collectionStatus ?? null);
+  }, [collectionStatus]);
 
   async function handleCollection(s: "owned" | "wishlist") {
     setLoading(true);
+    setActionError(null);
     try {
       if (status === s) {
-        // Remove
-        await fetch(`/api/collection?gameId=${game.id}`, { method: "DELETE" });
+        const res = await fetch(`/api/collection?gameId=${game.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to update");
         setStatus(null);
         onCollectionChange?.(game.id, null);
       } else {
-        await fetch("/api/collection", {
+        const res = await fetch("/api/collection", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ gameId: game.id, status: s }),
         });
+        if (!res.ok) throw new Error("Failed to update");
         setStatus(s);
         onCollectionChange?.(game.id, s);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setActionError("Failed to update");
+      setTimeout(() => setActionError(null), 3000);
     } finally {
       setLoading(false);
     }
@@ -85,6 +63,7 @@ export default function GameCard({
 
   return (
     <div className="group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all duration-200 hover:shadow-lg hover:shadow-black/30 flex flex-col">
+      {/* Card content as a link — no interactive children inside */}
       <Link href={`/games/${game.id}`} className="block">
         <div
           className={`relative overflow-hidden bg-zinc-800 ${isSmall ? "h-40" : "h-52"}`}
@@ -99,7 +78,7 @@ export default function GameCard({
               sizes="(max-width: 768px) 50vw, 33vw"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl">
+            <div className="w-full h-full flex items-center justify-center text-4xl" aria-hidden="true">
               🎲
             </div>
           )}
@@ -121,12 +100,12 @@ export default function GameCard({
 
           <div className="flex flex-wrap gap-1 mb-2">
             <span className="text-xs text-zinc-400 bg-zinc-800 rounded px-1.5 py-0.5">
-              👥 {game.min_players === game.max_players
+              <span aria-hidden="true">👥</span> {game.min_players === game.max_players
                 ? game.min_players
                 : `${game.min_players}-${game.max_players}`}
             </span>
             <span className="text-xs text-zinc-400 bg-zinc-800 rounded px-1.5 py-0.5">
-              ⏱ {game.min_playtime === game.max_playtime
+              <span aria-hidden="true">⏱</span> {game.min_playtime === game.max_playtime
                 ? `${game.min_playtime}m`
                 : `${game.min_playtime}-${game.max_playtime}m`}
             </span>
@@ -150,17 +129,22 @@ export default function GameCard({
 
           {reason && (
             <p className="mt-2 text-xs text-zinc-500 italic line-clamp-2">
-              💡 {reason}
+              <span aria-hidden="true">💡</span> {reason}
             </p>
           )}
         </div>
       </Link>
 
-      {/* Collection buttons */}
-      <div className="px-3 pb-3 flex gap-2 mt-auto">
+      {/* Collection buttons — outside the link to avoid nested interactives */}
+      <div className="px-3 pb-3 mt-auto">
+        {actionError && (
+          <p className="text-xs text-red-400 mb-1" role="alert">{actionError}</p>
+        )}
+        <div className="flex gap-2">
         <button
           onClick={() => handleCollection("owned")}
           disabled={loading}
+          aria-pressed={status === "owned"}
           className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${
             status === "owned"
               ? "bg-emerald-500 text-black"
@@ -172,6 +156,7 @@ export default function GameCard({
         <button
           onClick={() => handleCollection("wishlist")}
           disabled={loading}
+          aria-pressed={status === "wishlist"}
           className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${
             status === "wishlist"
               ? "bg-purple-500 text-white"
@@ -180,6 +165,7 @@ export default function GameCard({
         >
           {status === "wishlist" ? "♥ Saved" : "♡ Save"}
         </button>
+        </div>
       </div>
     </div>
   );

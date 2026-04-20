@@ -16,18 +16,9 @@ import {
   Pie,
   Cell,
 } from "recharts";
-
-interface PlayLog {
-  id: number;
-  game_id: number;
-  game_name: string;
-  thumbnail_url: string;
-  played_at: string;
-  players: number | null;
-  winner: string | null;
-  rating: number | null;
-  notes: string | null;
-}
+import type { PlayLog } from "@/types";
+import { SummaryCards } from "./_components/SummaryCards";
+import { RecentPlaysTable } from "./_components/RecentPlaysTable";
 
 interface Stats {
   totalPlays: number;
@@ -36,7 +27,7 @@ interface Stats {
   playsByMonth: Record<string, number>;
 }
 
-interface CollectionItem {
+interface StatsCollectionItem {
   game: {
     id: number;
     complexity: number;
@@ -58,17 +49,27 @@ const COLORS = [
 export default function StatsPage() {
   const [logs, setLogs] = useState<PlayLog[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [collection, setCollection] = useState<CollectionItem[]>([]);
+  const [collection, setCollection] = useState<StatsCollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/play-logs").then((r) => r.json()),
-      fetch("/api/collection").then((r) => r.json()),
+      fetch("/api/play-logs").then((r) => {
+        if (!r.ok) throw new Error("Failed to load play logs");
+        return r.json();
+      }),
+      fetch("/api/collection").then((r) => {
+        if (!r.ok) throw new Error("Failed to load collection");
+        return r.json();
+      }),
     ]).then(([playData, collData]) => {
       setLogs(playData.logs || []);
       setStats(playData.stats);
       setCollection(collData.items || []);
+      setLoading(false);
+    }).catch((e) => {
+      setError(e instanceof Error ? e.message : "Failed to load stats data");
       setLoading(false);
     });
   }, []);
@@ -84,6 +85,23 @@ export default function StatsPage() {
               className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 animate-pulse h-24"
             />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-white mb-8">Stats</h1>
+        <div className="bg-red-900/20 border border-red-800 rounded-xl p-6 text-center" role="alert">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -188,53 +206,13 @@ export default function StatsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold text-white mb-8">Your Stats</h1>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-          <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-            Total Plays
-          </p>
-          <p className="text-4xl font-bold text-white">
-            {stats?.totalPlays || 0}
-          </p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-          <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-            Unique Games Played
-          </p>
-          <p className="text-4xl font-bold text-white">
-            {stats?.uniqueGames || 0}
-          </p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-          <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-            In Collection
-          </p>
-          <p className="text-4xl font-bold text-emerald-400">
-            {ownedGames.length}
-          </p>
-        </div>
-        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-          <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-            Wishlisted
-          </p>
-          <p className="text-4xl font-bold text-purple-400">
-            {wishlistGames.length}
-          </p>
-        </div>
-      </div>
-
-      {avgRating && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-            <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-              Avg Play Rating
-            </p>
-            <p className="text-4xl font-bold text-yellow-400">{avgRating}</p>
-            <p className="text-xs text-zinc-500 mt-1">out of 10</p>
-          </div>
-        </div>
-      )}
+      <SummaryCards
+        totalPlays={stats?.totalPlays || 0}
+        uniqueGames={stats?.uniqueGames || 0}
+        ownedCount={ownedGames.length}
+        wishlistCount={wishlistGames.length}
+        avgRating={avgRating}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Plays by Month */}
@@ -243,6 +221,7 @@ export default function StatsPage() {
             <h2 className="text-lg font-bold text-white mb-4">
               Plays Per Month
             </h2>
+            <div role="img" aria-label={`Bar chart showing plays per month: ${monthChartData.map(d => `${d.month}: ${d.plays}`).join(', ')}`}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={monthChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
@@ -269,6 +248,7 @@ export default function StatsPage() {
                 <Bar dataKey="plays" fill="#34d399" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         )}
 
@@ -278,6 +258,7 @@ export default function StatsPage() {
             <h2 className="text-lg font-bold text-white mb-4">
               Collection by Complexity
             </h2>
+            <div role="img" aria-label={`Pie chart showing complexity distribution: ${complexityData.map(d => `${d.name}: ${d.value}`).join(', ')}`}>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
@@ -307,6 +288,7 @@ export default function StatsPage() {
                 />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </div>
         )}
 
@@ -316,6 +298,7 @@ export default function StatsPage() {
             <h2 className="text-lg font-bold text-white mb-4">
               Top Categories in Collection
             </h2>
+            <div role="img" aria-label={`Bar chart showing top categories: ${categoryData.map(d => `${d.name}: ${d.value}`).join(', ')}`}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={categoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
@@ -345,6 +328,7 @@ export default function StatsPage() {
                 <Bar dataKey="value" fill="#60a5fa" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         )}
 
@@ -354,6 +338,7 @@ export default function StatsPage() {
             <h2 className="text-lg font-bold text-white mb-4">
               Recent Play Ratings
             </h2>
+            <div role="img" aria-label={`Line chart showing recent play ratings: ${ratedLogs.map(d => `${d.name}: ${d.rating}/10`).join(', ')}`}>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={ratedLogs}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
@@ -386,6 +371,7 @@ export default function StatsPage() {
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           </div>
         )}
       </div>
@@ -427,65 +413,7 @@ export default function StatsPage() {
         </div>
       )}
 
-      {/* Recent Plays Table */}
-      {logs.length > 0 && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-white">Recent Plays</h2>
-            <Link
-              href="/collection"
-              className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              View Collection →
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-zinc-500 text-xs uppercase tracking-wider border-b border-zinc-800">
-                  <th className="pb-3 pr-4">Game</th>
-                  <th className="pb-3 pr-4">Date</th>
-                  <th className="pb-3 pr-4">Players</th>
-                  <th className="pb-3 pr-4">Winner</th>
-                  <th className="pb-3">Rating</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {logs.slice(0, 15).map((log) => (
-                  <tr key={log.id} className="hover:bg-zinc-800/50 transition-colors">
-                    <td className="py-3 pr-4">
-                      <Link
-                        href={`/games/${log.game_id}`}
-                        className="text-white hover:text-emerald-400 font-medium transition-colors"
-                      >
-                        {log.game_name}
-                      </Link>
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-400">
-                      {new Date(log.played_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-400">
-                      {log.players || "—"}
-                    </td>
-                    <td className="py-3 pr-4 text-yellow-400">
-                      {log.winner || "—"}
-                    </td>
-                    <td className="py-3">
-                      {log.rating ? (
-                        <span className="text-emerald-400 font-medium">
-                          {log.rating}/10
-                        </span>
-                      ) : (
-                        <span className="text-zinc-600">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <RecentPlaysTable logs={logs} />
     </div>
   );
 }

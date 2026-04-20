@@ -1,0 +1,49 @@
+"use client";
+
+import { useEffect } from "react";
+
+export default function Error({
+  error,
+  unstable_retry,
+}: {
+  error: Error & { digest?: string };
+  unstable_retry: () => void;
+}) {
+  useEffect(() => {
+    console.error("Application error:", error);
+  }, [error]);
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <div className="text-5xl mb-4">😵</div>
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Something went wrong
+        </h2>
+        <p className="text-zinc-400 mb-6 text-sm">
+          An unexpected error occurred. Please try again or return to the home
+          page.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => unstable_retry()}
+            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors"
+          >
+            Try Again
+          </button>
+          <a
+            href="/"
+            className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-lg transition-colors"
+          >
+            Go Home
+          </a>
+        </div>
+        {error.digest && (
+          <p className="mt-4 text-xs text-zinc-600">
+            Error ID: {error.digest}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

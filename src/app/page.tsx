@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDb, parseGame, type GameRow } from "@/lib/db";
+import { getDb, parseGame, type GameRow, GAME_LIST_COLUMNS } from "@/lib/db";
 import TopGamesShowcase from "@/components/TopGamesShowcase";
 
 const HIGHLIGHTS = [
@@ -34,7 +34,7 @@ export default function HomePage() {
   const db = getDb();
   const topGames = (
     db
-      .prepare("SELECT * FROM games ORDER BY bgg_rank ASC LIMIT 6")
+      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC LIMIT 6`)
       .all() as GameRow[]
   ).map(parseGame);
 

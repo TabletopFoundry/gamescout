@@ -1,4 +1,5 @@
-import { getDb, parseGame, type GameRow, type PriceRow, type ReviewRow } from "@/lib/db";
+import { getDb, parseGame, type GameRow, type PriceRow, type ReviewRow, GAME_COLUMNS, GAME_LIST_COLUMNS } from "@/lib/db";
+import { getUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,10 @@ export async function GET(
 ) {
   const { id } = await params;
   const db = getDb();
+  const userId = await getUserId();
 
   const gameRow = db
-    .prepare("SELECT * FROM games WHERE id = ?")
+    .prepare(`SELECT ${GAME_COLUMNS} FROM games WHERE id = ?`)
     .get(Number(id)) as GameRow | undefined;
 
   if (!gameRow) {
@@ -22,27 +24,28 @@ export async function GET(
   // Prices
   const prices = db
     .prepare(
-      `SELECT * FROM price_history WHERE game_id = ? ORDER BY price ASC`
+      `SELECT id, game_id, retailer, price, url, updated_at FROM price_history WHERE game_id = ? ORDER BY price ASC`
     )
     .all(Number(id)) as PriceRow[];
 
   // Reviews
   const reviews = db
     .prepare(
-      `SELECT r.*, 'demo' as username FROM reviews r WHERE r.game_id = ? ORDER BY r.created_at DESC`
+      `SELECT r.id, r.user_id, r.game_id, r.rating, r.body, r.created_at, 'demo' as username FROM reviews r WHERE r.game_id = ? ORDER BY r.created_at DESC`
     )
     .all(Number(id)) as (ReviewRow & { username: string })[];
 
-  // Collection status for demo user
+  // Collection status for current user
   const collectionStatus = db
     .prepare(
-      `SELECT status FROM collection WHERE user_id = 1 AND game_id = ?`
+      `SELECT status FROM collection WHERE user_id = ? AND game_id = ?`
     )
-    .get(Number(id)) as { status: string } | undefined;
+    .get(userId, Number(id)) as { status: string } | undefined;
 
   // Similar games (by overlapping categories)
+  // TODO: Move to SQL when game catalog exceeds ~500 entries
   const allGames = (
-    db.prepare("SELECT * FROM games ORDER BY bgg_rank ASC").all() as GameRow[]
+    db.prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC`).all() as GameRow[]
   ).map(parseGame);
 
   const similar = allGames
@@ -65,9 +68,9 @@ export async function GET(
   // Play logs for this game
   const playLogs = db
     .prepare(
-      `SELECT pl.*, g.name as game_name FROM play_logs pl JOIN games g ON pl.game_id = g.id WHERE pl.user_id = 1 AND pl.game_id = ? ORDER BY pl.played_at DESC`
+      `SELECT pl.id, pl.played_at, pl.players, pl.winner, pl.rating, pl.notes, g.name as game_name FROM play_logs pl JOIN games g ON pl.game_id = g.id WHERE pl.user_id = ? AND pl.game_id = ? ORDER BY pl.played_at DESC`
     )
-    .all(Number(id));
+    .all(userId, Number(id));
 
   return Response.json({
     game,

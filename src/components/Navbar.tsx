@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -11,6 +12,7 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur border-b border-zinc-800">
@@ -28,6 +30,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   pathname === link.href
                     ? "bg-zinc-800 text-white"
@@ -39,31 +42,53 @@ export default function Navbar() {
             ))}
           </div>
 
-          <Link
-            href="/quiz"
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm rounded-lg transition-colors"
-          >
-            Take Quiz
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/quiz"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm rounded-lg transition-colors"
+            >
+              Take Quiz
+            </Link>
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+              aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Mobile nav */}
-      <div className="md:hidden border-t border-zinc-800 px-4 py-2 flex gap-1">
-        {navLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex-1 text-center px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
-              pathname === link.href
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </div>
+      {/* Mobile nav - collapsible */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-zinc-800 px-4 py-3 space-y-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileOpen(false)}
+              aria-current={pathname === link.href ? "page" : undefined}
+              className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === link.href
+                  ? "bg-zinc-800 text-white"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import type { RatingValue } from "@/types";
+import { GameRatingStep } from "./_components/GameRatingStep";
+import { PreferenceStep } from "./_components/PreferenceStep";
+import { QuizSummary } from "./_components/QuizSummary";
 
 const QUIZ_GAMES = [
   {
@@ -97,16 +100,6 @@ const QUIZ_GAMES = [
   },
 ];
 
-type RatingValue = "loved" | "liked" | "neutral" | "disliked" | "havent_played";
-
-const RATINGS: { value: RatingValue; label: string; emoji: string; color: string }[] = [
-  { value: "loved", label: "Loved it", emoji: "❤️", color: "bg-red-500 text-white border-red-500" },
-  { value: "liked", label: "Liked it", emoji: "👍", color: "bg-emerald-500 text-black border-emerald-500" },
-  { value: "neutral", label: "It's ok", emoji: "😐", color: "bg-yellow-500 text-black border-yellow-500" },
-  { value: "disliked", label: "Disliked", emoji: "👎", color: "bg-zinc-600 text-white border-zinc-600" },
-  { value: "havent_played", label: "Haven't played", emoji: "🤷", color: "bg-zinc-800 text-zinc-300 border-zinc-700" },
-];
-
 const PLAYER_COUNT_OPTIONS = ["1", "2", "2-3", "3-4", "4-6", "6+"];
 const DURATION_OPTIONS = ["< 30 min", "30-60 min", "1-2 hours", "2-3 hours", "3+ hours"];
 const COMPLEXITY_OPTIONS = [
@@ -119,12 +112,46 @@ const THEME_OPTIONS = [
   "Nature", "Abstract", "Adventure", "Cooperative", "Party",
 ];
 
+const STORAGE_KEY = "gamescout_quiz_state";
+
 interface QuizState {
   gameRatings: Record<number, RatingValue>;
   playerCount: string;
   duration: string;
   complexity: string;
   themes: string[];
+}
+
+interface PersistedQuizState {
+  step: number;
+  quizState: QuizState;
+}
+
+function loadPersistedState(): PersistedQuizState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedQuizState;
+  } catch {
+    return null;
+  }
+}
+
+function persistState(step: number, quizState: QuizState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, quizState }));
+  } catch {
+    // localStorage may be unavailable
+  }
+}
+
+function clearPersistedState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // noop
+  }
 }
 
 export default function QuizPage() {
@@ -138,7 +165,25 @@ export default function QuizPage() {
     themes: [],
   });
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore persisted state on mount
+  useEffect(() => {
+    const saved = loadPersistedState();
+    if (saved) {
+      setStep(saved.step);
+      setQuizState(saved.quizState);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist state on changes (after hydration)
+  useEffect(() => {
+    if (!hydrated) return;
+    persistState(step, quizState);
+  }, [step, quizState, hydrated]);
 
   const totalSteps = QUIZ_GAMES.length + 4; // 10 games + 4 preference steps
   const progress = Math.round(((step) / totalSteps) * 100);
@@ -146,6 +191,10 @@ export default function QuizPage() {
   const isGameStep = step < QUIZ_GAMES.length;
   const currentGame = isGameStep ? QUIZ_GAMES[step] : null;
   const prefStep = step - QUIZ_GAMES.length; // 0=players, 1=duration, 2=complexity, 3=themes
+
+  function goBack() {
+    setStep((s) => Math.max(0, s - 1));
+  }
 
   function rateGame(gameId: number, rating: RatingValue) {
     setQuizState((prev) => ({
@@ -167,6 +216,7 @@ export default function QuizPage() {
 
   async function handleSubmit() {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const gameRatings = Object.entries(quizState.gameRatings).map(
         ([gameId, rating]) => ({ gameId: Number(gameId), rating })
@@ -179,93 +229,41 @@ export default function QuizPage() {
         { key: "themes", value: quizState.themes.join(",") },
       ];
 
-      await fetch("/api/quiz", {
+      const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameRatings, preferences }),
       });
 
+      if (!res.ok) throw new Error("Failed to save quiz results");
+
+      clearPersistedState();
       router.push("/discover?from=quiz");
     } catch (e) {
-      console.error(e);
+      setSubmitError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
       setSubmitting(false);
     }
   }
 
-  if (step >= totalSteps) {
-    // Summary / submit step
+  // Don't render until hydrated to avoid flicker with persisted state
+  if (!hydrated) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🎉</div>
-          <h1 className="text-3xl font-bold text-white mb-2">Profile Complete!</h1>
-          <p className="text-zinc-400">
-            We&apos;ve built your taste profile. Ready to see your recommendations?
-          </p>
-        </div>
-
-        {/* Summary */}
-        <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 mb-8">
-          <h2 className="text-lg font-semibold text-white mb-4">Your Taste Summary</h2>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-zinc-500 mb-1">Games Rated</p>
-              <p className="text-white font-medium">{Object.keys(quizState.gameRatings).length}</p>
-            </div>
-            <div>
-              <p className="text-zinc-500 mb-1">Group Size</p>
-              <p className="text-white font-medium">{quizState.playerCount || "—"}</p>
-            </div>
-            <div>
-              <p className="text-zinc-500 mb-1">Session Length</p>
-              <p className="text-white font-medium">{quizState.duration || "—"}</p>
-            </div>
-            <div>
-              <p className="text-zinc-500 mb-1">Complexity</p>
-              <p className="text-white font-medium">{quizState.complexity || "—"}</p>
-            </div>
-          </div>
-          {quizState.themes.length > 0 && (
-            <div className="mt-3">
-              <p className="text-zinc-500 mb-1 text-sm">Favorite Themes</p>
-              <div className="flex flex-wrap gap-1">
-                {quizState.themes.map((t) => (
-                  <span key={t} className="text-xs bg-emerald-400/10 text-emerald-400 rounded-full px-2 py-0.5">
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Loved games */}
-          {Object.entries(quizState.gameRatings).some(([, r]) => r === "loved") && (
-            <div className="mt-3">
-              <p className="text-zinc-500 mb-1 text-sm">Loved</p>
-              <div className="flex flex-wrap gap-1">
-                {Object.entries(quizState.gameRatings)
-                  .filter(([, r]) => r === "loved")
-                  .map(([id]) => {
-                    const g = QUIZ_GAMES.find((g) => g.id === Number(id));
-                    return g ? (
-                      <span key={id} className="text-xs bg-red-400/10 text-red-400 rounded-full px-2 py-0.5">
-                        ❤️ {g.name}
-                      </span>
-                    ) : null;
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold text-lg rounded-xl transition-colors"
-        >
-          {submitting ? "Saving..." : "See My Recommendations →"}
-        </button>
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <div className="animate-pulse text-zinc-400">Loading quiz...</div>
       </div>
+    );
+  }
+
+  if (step >= totalSteps) {
+    return (
+      <QuizSummary
+        quizState={quizState}
+        quizGames={QUIZ_GAMES}
+        submitting={submitting}
+        submitError={submitError}
+        onBack={goBack}
+        onSubmit={handleSubmit}
+      />
     );
   }
 
@@ -281,202 +279,80 @@ export default function QuizPage() {
           <div
             className="h-full bg-emerald-500 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Quiz progress: step ${step + 1} of ${totalSteps}`}
           />
         </div>
       </div>
 
       {isGameStep && currentGame ? (
-        /* Game rating step */
-        <div>
-          <p className="text-zinc-400 text-sm mb-1">
-            Have you played this game?
-          </p>
-          <h1 className="text-3xl font-bold text-white mb-6">
-            {currentGame.name}
-          </h1>
-
-          <div className="relative mb-6">
-            <div className="w-full aspect-[16/9] max-h-64 rounded-xl overflow-hidden bg-zinc-800 flex items-center justify-center">
-              {!imgErrors[currentGame.id] ? (
-                <Image
-                  src={currentGame.thumbnail_url}
-                  alt={currentGame.name}
-                  fill
-                  className="object-cover"
-                  onError={() =>
-                    setImgErrors((prev) => ({ ...prev, [currentGame.id]: true }))
-                  }
-                  sizes="(max-width: 768px) 100vw, 672px"
-                />
-              ) : (
-                <div className="text-8xl">🎲</div>
-              )}
-            </div>
-          </div>
-
-          <p className="text-zinc-400 text-sm mb-1 italic">{currentGame.description}</p>
-          <p className="text-zinc-500 text-xs mb-6">
-            {currentGame.year} · Complexity:{" "}
-            <span className="text-yellow-400">{currentGame.complexity}/5</span>
-          </p>
-
-          <div className="grid grid-cols-1 gap-3">
-            {RATINGS.map((r) => {
-              const selected = quizState.gameRatings[currentGame.id] === r.value;
-              return (
-                <button
-                  key={r.value}
-                  onClick={() => rateGame(currentGame.id, r.value)}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
-                    selected
-                      ? r.color
-                      : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-                  }`}
-                >
-                  <span className="text-xl">{r.emoji}</span>
-                  <span className="font-medium">{r.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => setStep((s) => s + 1)}
-            className="mt-4 w-full py-2 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-          >
-            Skip →
-          </button>
-        </div>
+        <GameRatingStep
+          game={currentGame}
+          selectedRating={quizState.gameRatings[currentGame.id]}
+          imgError={imgErrors[currentGame.id] || false}
+          onImgError={() =>
+            setImgErrors((prev) => ({ ...prev, [currentGame.id]: true }))
+          }
+          onRate={rateGame}
+          onSkip={() => setStep((s) => s + 1)}
+          onBack={goBack}
+          showBack={step > 0}
+        />
       ) : prefStep === 0 ? (
-        /* Player count preference */
-        <div>
-          <p className="text-zinc-400 text-sm mb-1">Preferences</p>
-          <h1 className="text-3xl font-bold text-white mb-6">
-            How many players do you usually play with?
-          </h1>
-          <div className="grid grid-cols-3 gap-3">
-            {PLAYER_COUNT_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => {
-                  setQuizState((prev) => ({ ...prev, playerCount: opt }));
-                  setTimeout(() => setStep((s) => s + 1), 200);
-                }}
-                className={`p-4 rounded-xl border-2 font-medium transition-all ${
-                  quizState.playerCount === opt
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setStep((s) => s + 1)}
-            className="mt-4 w-full py-2 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-          >
-            Skip →
-          </button>
-        </div>
+        <PreferenceStep
+          title="How many players do you usually play with?"
+          options={PLAYER_COUNT_OPTIONS}
+          selectedValue={quizState.playerCount}
+          onSelect={(opt) => {
+            setQuizState((prev) => ({ ...prev, playerCount: opt }));
+            setTimeout(() => setStep((s) => s + 1), 200);
+          }}
+          onSkip={() => setStep((s) => s + 1)}
+          onBack={goBack}
+          ariaLabel="Player count preference"
+          columns={3}
+        />
       ) : prefStep === 1 ? (
-        /* Duration preference */
-        <div>
-          <p className="text-zinc-400 text-sm mb-1">Preferences</p>
-          <h1 className="text-3xl font-bold text-white mb-6">
-            How long is your ideal gaming session?
-          </h1>
-          <div className="grid grid-cols-1 gap-3">
-            {DURATION_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => {
-                  setQuizState((prev) => ({ ...prev, duration: opt }));
-                  setTimeout(() => setStep((s) => s + 1), 200);
-                }}
-                className={`p-4 rounded-xl border-2 font-medium transition-all text-left ${
-                  quizState.duration === opt
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setStep((s) => s + 1)}
-            className="mt-4 w-full py-2 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-          >
-            Skip →
-          </button>
-        </div>
+        <PreferenceStep
+          title="How long is your ideal gaming session?"
+          options={DURATION_OPTIONS}
+          selectedValue={quizState.duration}
+          onSelect={(opt) => {
+            setQuizState((prev) => ({ ...prev, duration: opt }));
+            setTimeout(() => setStep((s) => s + 1), 200);
+          }}
+          onSkip={() => setStep((s) => s + 1)}
+          onBack={goBack}
+          ariaLabel="Session duration preference"
+        />
       ) : prefStep === 2 ? (
-        /* Complexity preference */
-        <div>
-          <p className="text-zinc-400 text-sm mb-1">Preferences</p>
-          <h1 className="text-3xl font-bold text-white mb-6">
-            How complex do you like your games?
-          </h1>
-          <div className="grid grid-cols-1 gap-3">
-            {COMPLEXITY_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  setQuizState((prev) => ({ ...prev, complexity: opt.label }));
-                  setTimeout(() => setStep((s) => s + 1), 200);
-                }}
-                className={`p-4 rounded-xl border-2 font-medium transition-all text-left ${
-                  quizState.complexity === opt.label
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-                }`}
-              >
-                <div className="font-semibold">{opt.label}</div>
-                <div className="text-sm text-zinc-400 mt-0.5">{opt.desc}</div>
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setStep((s) => s + 1)}
-            className="mt-4 w-full py-2 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-          >
-            Skip →
-          </button>
-        </div>
+        <PreferenceStep
+          title="How complex do you like your games?"
+          options={COMPLEXITY_OPTIONS}
+          selectedValue={quizState.complexity}
+          onSelect={(opt) => {
+            setQuizState((prev) => ({ ...prev, complexity: opt }));
+            setTimeout(() => setStep((s) => s + 1), 200);
+          }}
+          onSkip={() => setStep((s) => s + 1)}
+          onBack={goBack}
+          ariaLabel="Complexity preference"
+        />
       ) : (
-        /* Theme preferences */
-        <div>
-          <p className="text-zinc-400 text-sm mb-1">Preferences</p>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            What themes do you enjoy?
-          </h1>
-          <p className="text-zinc-400 text-sm mb-6">Select all that apply</p>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {THEME_OPTIONS.map((theme) => {
-              const selected = quizState.themes.includes(theme);
-              return (
-                <button
-                  key={theme}
-                  onClick={() => toggleTheme(theme)}
-                  className={`p-3 rounded-xl border-2 font-medium text-sm transition-all ${
-                    selected
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                      : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-                  }`}
-                >
-                  {selected ? "✓ " : ""}{theme}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            onClick={() => setStep((s) => s + 1)}
-            className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-colors"
-          >
-            Continue →
-          </button>
-        </div>
+        <PreferenceStep
+          title="What themes do you enjoy?"
+          options={THEME_OPTIONS}
+          selectedValue={quizState.themes}
+          onSelect={(theme) => toggleTheme(theme)}
+          onSkip={() => setStep((s) => s + 1)}
+          onBack={goBack}
+          ariaLabel="Select themes you enjoy"
+          multiSelect
+          columns={2}
+        />
       )}
     </div>
   );

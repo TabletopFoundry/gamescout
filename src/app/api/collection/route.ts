@@ -1,18 +1,24 @@
 import { getDb, parseGame, type GameRow, type CollectionRow } from "@/lib/db";
+import { getUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const db = getDb();
+  const userId = await getUserId();
 
   const rows = db
     .prepare(
-      `SELECT c.*, g.* FROM collection c 
+      `SELECT c.id, c.user_id, c.game_id, c.status, c.added_at,
+              g.id as g_id, g.name, g.year, g.description, g.min_players, g.max_players, 
+              g.min_playtime, g.max_playtime, g.complexity, g.bgg_rating, g.bgg_rank,
+              g.categories, g.mechanics, g.designer, g.publisher, g.image_url, g.thumbnail_url
+       FROM collection c 
        JOIN games g ON c.game_id = g.id 
-       WHERE c.user_id = 1 
+       WHERE c.user_id = ? 
        ORDER BY c.added_at DESC`
     )
-    .all() as (CollectionRow & GameRow)[];
+    .all(userId) as (CollectionRow & GameRow)[];
 
   const items = rows.map((row) => ({
     collectionId: row.id,
@@ -44,8 +50,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const db = getDb();
-  const body = await request.json();
-  const { gameId, status } = body as { gameId: number; status: "owned" | "wishlist" };
+  const userId = await getUserId();
+
+  let body: { gameId: number; status: "owned" | "wishlist" };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { gameId, status } = body;
 
   if (!gameId || !["owned", "wishlist"].includes(status)) {
     return Response.json({ error: "Invalid request" }, { status: 400 });
@@ -53,23 +67,24 @@ export async function POST(request: Request) {
 
   db.prepare(`
     INSERT INTO collection (user_id, game_id, status)
-    VALUES (1, @gameId, @status)
+    VALUES (@userId, @gameId, @status)
     ON CONFLICT(user_id, game_id) DO UPDATE SET status = excluded.status
-  `).run({ gameId, status });
+  `).run({ userId, gameId, status });
 
   return Response.json({ ok: true });
 }
 
 export async function DELETE(request: Request) {
   const db = getDb();
+  const userId = await getUserId();
   const { searchParams } = new URL(request.url);
   const gameId = Number(searchParams.get("gameId"));
 
-  if (!gameId) {
+  if (Number.isNaN(gameId) || gameId <= 0) {
     return Response.json({ error: "gameId required" }, { status: 400 });
   }
 
-  db.prepare(`DELETE FROM collection WHERE user_id = 1 AND game_id = ?`).run(gameId);
+  db.prepare(`DELETE FROM collection WHERE user_id = ? AND game_id = ?`).run(userId, gameId);
 
   return Response.json({ ok: true });
 }

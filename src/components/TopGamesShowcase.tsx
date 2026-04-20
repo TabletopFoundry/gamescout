@@ -3,13 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import type { Game } from "@/types";
 
-interface TopGame {
-  id: number;
-  name: string;
-  bgg_rating: number;
-  thumbnail_url: string;
-}
+type TopGame = Pick<Game, "id" | "name" | "bgg_rating" | "thumbnail_url">;
 
 function TopGameItem({ game }: { game: TopGame }) {
   const [imgError, setImgError] = useState(false);

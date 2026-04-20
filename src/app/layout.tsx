@@ -25,16 +25,22 @@ export default function RootLayout({
       className={`${geistSans.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100 font-sans">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-emerald-500 focus:text-black focus:font-semibold focus:rounded-lg"
+        >
+          Skip to main content
+        </a>
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main id="main-content" className="flex-1">{children}</main>
         <footer className="border-t border-zinc-800 py-6 text-center text-xs text-zinc-600">
           © {new Date().getFullYear()} GameScout · Prices shown are for
           informational purposes only. We may earn a commission on purchases. ·{" "}
-          <a href="#" className="hover:text-zinc-400">
+          <a href="/privacy" className="hover:text-zinc-400">
             Privacy
           </a>{" "}
           ·{" "}
-          <a href="#" className="hover:text-zinc-400">
+          <a href="/terms" className="hover:text-zinc-400">
             Terms
           </a>
         </footer>

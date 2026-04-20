@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getDb, parseGame, type GameRow } from "@/lib/db";
+import { getDb, parseGame, type GameRow, GAME_LIST_COLUMNS } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +18,14 @@ export async function GET(request: NextRequest) {
   let rows: GameRow[];
 
   if (q) {
+    // Escape SQL LIKE wildcard characters to prevent wildcard injection
+    const escaped = q.replace(/[%_\\]/g, "\\$&");
     rows = db
-      .prepare(`SELECT * FROM games WHERE name LIKE ? ORDER BY bgg_rank ASC LIMIT ?`)
-      .all(`%${q}%`, limit) as GameRow[];
+      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games WHERE name LIKE ? ESCAPE '\\' ORDER BY bgg_rank ASC LIMIT ?`)
+      .all(`%${escaped}%`, limit) as GameRow[];
   } else {
     rows = db
-      .prepare(`SELECT * FROM games ORDER BY bgg_rank ASC LIMIT ?`)
+      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC LIMIT ?`)
       .all(limit) as GameRow[];
   }
 

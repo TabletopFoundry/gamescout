@@ -5,39 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import EmptyState from "@/components/EmptyState";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
-
-interface Game {
-  id: number;
-  name: string;
-  year: number;
-  min_players: number;
-  max_players: number;
-  min_playtime: number;
-  max_playtime: number;
-  complexity: number;
-  bgg_rating: number;
-  categories: string[];
-  thumbnail_url: string;
-}
-
-interface CollectionItem {
-  collectionId: number;
-  status: "owned" | "wishlist";
-  addedAt: string;
-  game: Game;
-}
-
-interface PlayLog {
-  id: number;
-  game_id: number;
-  game_name: string;
-  thumbnail_url: string;
-  played_at: string;
-  players: number | null;
-  winner: string | null;
-  rating: number | null;
-  notes: string | null;
-}
+import type { Game, CollectionItem, PlayLog } from "@/types";
 
 export default function CollectionPage() {
   const [items, setItems] = useState<CollectionItem[]>([]);
@@ -46,6 +14,7 @@ export default function CollectionPage() {
   const [sortBy, setSortBy] = useState<"added" | "name" | "rating">("added");
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
   const [removing, setRemoving] = useState<Record<number, boolean>>({});
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   // Play log state
   const [playLogs, setPlayLogs] = useState<PlayLog[]>([]);
@@ -56,8 +25,11 @@ export default function CollectionPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/collection");
+      if (!res.ok) throw new Error("Failed to load collection");
       const data = await res.json();
       setItems(data.items || []);
+    } catch {
+      console.error("Failed to load collection");
     } finally {
       setLoading(false);
     }
@@ -75,8 +47,11 @@ export default function CollectionPage() {
     setPlayLogsLoading(true);
     try {
       const res = await fetch("/api/play-logs");
+      if (!res.ok) throw new Error("Failed to load play logs");
       const data = await res.json();
       setPlayLogs(data.logs || []);
+    } catch {
+      console.error("Failed to load play logs");
     } finally {
       setPlayLogsLoading(false);
     }
@@ -93,21 +68,33 @@ export default function CollectionPage() {
   }
 
   async function moveToOwned(gameId: number) {
-    await fetch("/api/collection", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId, status: "owned" }),
-    });
-    setItems((prev) =>
-      prev.map((i) =>
-        i.game.id === gameId ? { ...i, status: "owned" } : i
-      )
-    );
+    try {
+      const res = await fetch("/api/collection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, status: "owned" }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      setItems((prev) =>
+        prev.map((i) =>
+          i.game.id === gameId ? { ...i, status: "owned" } : i
+        )
+      );
+    } catch {
+      setMutationError("Failed to move game. Please try again.");
+      setTimeout(() => setMutationError(null), 3000);
+    }
   }
 
   async function deletePlayLog(id: number) {
-    await fetch(`/api/play-logs?id=${id}`, { method: "DELETE" });
-    setPlayLogs((prev) => prev.filter((l) => l.id !== id));
+    try {
+      const res = await fetch(`/api/play-logs?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      setPlayLogs((prev) => prev.filter((l) => l.id !== id));
+    } catch {
+      setMutationError("Failed to delete play log. Please try again.");
+      setTimeout(() => setMutationError(null), 3000);
+    }
   }
 
   const filteredItems = items.filter((i) => i.status === tab);
@@ -151,6 +138,13 @@ export default function CollectionPage() {
           </Link>
         </div>
       </div>
+
+      {/* Mutation error toast */}
+      {mutationError && (
+        <div className="mb-4 bg-red-900/20 border border-red-800 rounded-xl p-4 text-red-400 text-sm" role="alert">
+          {mutationError}
+        </div>
+      )}
 
       {/* Play Logs Section */}
       {showLogs && (
@@ -220,6 +214,7 @@ export default function CollectionPage() {
                   <button
                     onClick={() => deletePlayLog(log.id)}
                     className="text-xs text-zinc-600 hover:text-red-400 transition-colors shrink-0"
+                    aria-label={`Delete play log for ${log.game_name}`}
                   >
                     ✕
                   </button>
@@ -246,8 +241,12 @@ export default function CollectionPage() {
 
       {/* Tabs */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-1 bg-zinc-900 rounded-xl p-1">
+        <div role="tablist" aria-label="Collection filter" className="flex gap-1 bg-zinc-900 rounded-xl p-1">
           <button
+            role="tab"
+            aria-selected={tab === "owned"}
+            aria-controls="tabpanel-collection"
+            id="tab-owned"
             onClick={() => setTab("owned")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === "owned"
@@ -258,6 +257,10 @@ export default function CollectionPage() {
             Owned ({ownedCount})
           </button>
           <button
+            role="tab"
+            aria-selected={tab === "wishlist"}
+            aria-controls="tabpanel-collection"
+            id="tab-wishlist"
             onClick={() => setTab("wishlist")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === "wishlist"
@@ -281,6 +284,7 @@ export default function CollectionPage() {
       </div>
 
       {/* Grid */}
+      <div role="tabpanel" id="tabpanel-collection" aria-labelledby={`tab-${tab}`}>
       {loading ? (
         <GridSkeleton count={8} />
       ) : sortedItems.length === 0 ? (
@@ -365,6 +369,7 @@ export default function CollectionPage() {
                   onClick={() => removeItem(game.id)}
                   disabled={removing[game.id]}
                   className="text-xs py-1.5 px-2 rounded-md bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-colors"
+                  aria-label={`Remove ${game.name} from collection`}
                 >
                   {removing[game.id] ? "..." : "✕"}
                 </button>
@@ -373,6 +378,7 @@ export default function CollectionPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

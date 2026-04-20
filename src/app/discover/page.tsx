@@ -6,38 +6,8 @@ import { Suspense } from "react";
 import GameCard from "@/components/GameCard";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
 import EmptyState from "@/components/EmptyState";
-
-const MOODS = [
-  { label: "Quick Party Game", emoji: "🎉", maxComplexity: 2, maxPlaytime: 45 },
-  { label: "Deep Strategy", emoji: "🧠", minComplexity: 3.5 },
-  { label: "Cozy Two-Player", emoji: "❤️", maxPlayers: 2 },
-  { label: "Family Game Night", emoji: "👨‍👩‍👧", maxComplexity: 2.5, minPlayers: 3 },
-  { label: "Epic Adventure", emoji: "⚔️", categories: ["Adventure", "Fantasy"] },
-  { label: "Solo Evening", emoji: "🌙", maxPlayers: 1 },
-  { label: "Cooperative", emoji: "🤝", categories: ["Cooperative"] },
-  { label: "Gateway Game", emoji: "🚀", maxComplexity: 2, maxPlaytime: 60 },
-];
-
-interface Game {
-  id: number;
-  name: string;
-  year: number;
-  min_players: number;
-  max_players: number;
-  min_playtime: number;
-  max_playtime: number;
-  complexity: number;
-  bgg_rating: number;
-  categories: string[];
-  mechanics: string[];
-  thumbnail_url: string;
-}
-
-interface RecommendedGame {
-  game: Game;
-  score: number;
-  reason: string;
-}
+import { MOODS } from "@/lib/moods";
+import type { Game, RecommendedGame, CollectionStatus } from "@/types";
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -61,7 +31,7 @@ function DiscoverContent() {
 
   const [profile, setProfile] = useState<{ summary: string } | null>(null);
   const [collectionStatuses, setCollectionStatuses] = useState<
-    Record<number, "owned" | "wishlist" | null>
+    Record<number, CollectionStatus>
   >({});
 
   useEffect(() => {
@@ -88,17 +58,21 @@ function DiscoverContent() {
   async function loadCollection() {
     try {
       const res = await fetch("/api/collection");
+      if (!res.ok) throw new Error("Failed to load collection");
       const data = await res.json();
       const statuses: Record<number, "owned" | "wishlist"> = {};
       for (const item of data.items || []) {
         statuses[item.game.id] = item.status;
       }
       setCollectionStatuses(statuses);
-    } catch {}
+    } catch {
+      console.error("Failed to load collection statuses");
+    }
   }
 
   const loadBrowse = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({ limit: "50" });
     if (minPlayers > 0) params.set("minPlayers", String(minPlayers));
     if (maxComplexity < 5) params.set("maxComplexity", String(maxComplexity));
@@ -106,6 +80,7 @@ function DiscoverContent() {
 
     try {
       const res = await fetch(`/api/games?${params}`);
+      if (!res.ok) throw new Error("Failed to load games");
       const data = await res.json();
       let games: Game[] = data.games || [];
 
@@ -134,6 +109,8 @@ function DiscoverContent() {
       }
 
       setBrowseGames(games);
+    } catch {
+      setError("Failed to load games. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -142,10 +119,14 @@ function DiscoverContent() {
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     setSearchLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/games?q=${encodeURIComponent(searchQuery)}&limit=50`);
+      if (!res.ok) throw new Error("Failed to search games");
       const data = await res.json();
       setSearchResults(data.games || []);
+    } catch {
+      setError("Search failed. Please try again.");
     } finally {
       setSearchLoading(false);
     }
@@ -169,7 +150,7 @@ function DiscoverContent() {
 
   function handleCollectionChange(
     gameId: number,
-    status: "owned" | "wishlist" | null
+    status: CollectionStatus
   ) {
     setCollectionStatuses((prev) => ({ ...prev, [gameId]: status }));
   }
@@ -187,10 +168,14 @@ function DiscoverContent() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-zinc-900 rounded-xl p-1 max-w-sm">
+      <div role="tablist" aria-label="Discover navigation" className="flex gap-1 mb-6 bg-zinc-900 rounded-xl p-1 max-w-sm">
         {(["recommended", "browse", "search"] as const).map((t) => (
           <button
             key={t}
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls={`tabpanel-${t}`}
+            id={`tab-${t}`}
             onClick={() => setTab(t)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
               tab === t
@@ -218,6 +203,7 @@ function DiscoverContent() {
                   onClick={() =>
                     setSelectedMood(selectedMood === mood.label ? null : mood.label)
                   }
+                  aria-pressed={selectedMood === mood.label}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
                     selectedMood === mood.label
                       ? "bg-emerald-500 text-black border-emerald-500"
@@ -306,7 +292,7 @@ function DiscoverContent() {
 
       {/* Content */}
       {error && (
-        <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6 text-red-400">
+        <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6 text-red-400" role="alert">
           {error}
           <button onClick={loadRecommendations} className="ml-2 underline">
             Retry
