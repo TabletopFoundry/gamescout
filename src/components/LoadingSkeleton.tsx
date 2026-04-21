@@ -1,6 +1,6 @@
 export function GameCardSkeleton() {
   return (
-    <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col animate-pulse">
+    <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col animate-pulse" role="status" aria-label="Loading game card">
       <div className="h-52 bg-zinc-800" />
       <div className="p-3 flex flex-col gap-2">
         <div className="h-4 bg-zinc-800 rounded w-3/4" />
@@ -31,7 +31,7 @@ export function GridSkeleton({ count = 12 }: { count?: number }) {
 
 export function DetailSkeleton() {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse">
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse" role="status" aria-label="Loading game details">
       <div className="flex flex-col md:flex-row gap-8">
         <div className="md:w-64 shrink-0">
           <div className="aspect-[3/4] bg-zinc-800 rounded-xl" />

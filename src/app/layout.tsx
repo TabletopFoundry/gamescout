@@ -9,9 +9,19 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "GameScout — Board Game Discovery",
+  title: {
+    default: "GameScout — Board Game Discovery",
+    template: "%s — GameScout",
+  },
   description:
     "Discover your next favorite board game with personalized recommendations powered by your taste profile.",
+  keywords: ["board games", "board game recommendations", "board game collection", "BGG", "tabletop games"],
+  openGraph: {
+    title: "GameScout — Board Game Discovery",
+    description: "Personalized board game recommendations, collection tracking, and price comparison.",
+    type: "website",
+    siteName: "GameScout",
+  },
 };
 
 export default function RootLayout({

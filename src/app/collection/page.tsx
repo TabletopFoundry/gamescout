@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import EmptyState from "@/components/EmptyState";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
-import type { Game, CollectionItem, PlayLog } from "@/types";
+import type { CollectionItem, PlayLog } from "@/types";
 
 export default function CollectionPage() {
   const [items, setItems] = useState<CollectionItem[]>([]);

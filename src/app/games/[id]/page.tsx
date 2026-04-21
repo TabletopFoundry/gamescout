@@ -49,6 +49,20 @@ export default function GameDetailPage({
   const [alertSet, setAlertSet] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
+  const loadCollectionStatuses = useCallback(async () => {
+    try {
+      const res = await fetch("/api/collection");
+      const data = await res.json();
+      const statuses: Record<number, CollectionStatus> = {};
+      for (const item of data.items || []) {
+        statuses[item.game.id] = item.status;
+      }
+      setSimilarStatuses(statuses);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
   const loadGame = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -75,21 +89,7 @@ export default function GameDetailPage({
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [loadGame]);
-
-  async function loadCollectionStatuses() {
-    try {
-      const res = await fetch("/api/collection");
-      const data = await res.json();
-      const statuses: Record<number, CollectionStatus> = {};
-      for (const item of data.items || []) {
-        statuses[item.game.id] = item.status;
-      }
-      setSimilarStatuses(statuses);
-    } catch {
-      // non-critical
-    }
-  }
+  }, [loadGame, loadCollectionStatuses]);
 
   function handleSimilarCollectionChange(gameId: number, status: CollectionStatus) {
     setSimilarStatuses((prev) => ({ ...prev, [gameId]: status }));

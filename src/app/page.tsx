@@ -103,7 +103,7 @@ export default function HomePage() {
                 key={h.title}
                 className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 hover:border-zinc-700 transition-colors"
               >
-                <div className="text-3xl mb-3">{h.icon}</div>
+                <div className="text-3xl mb-3" aria-hidden="true">{h.icon}</div>
                 <h3 className="text-white font-semibold mb-2">{h.title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed">
                   {h.description}

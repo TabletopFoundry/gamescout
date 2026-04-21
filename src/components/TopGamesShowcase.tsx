@@ -26,7 +26,7 @@ function TopGameItem({ game }: { game: TopGame }) {
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className="text-4xl">🎲</div>
+          <div className="text-4xl" aria-hidden="true">🎲</div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-2">

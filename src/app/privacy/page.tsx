@@ -26,9 +26,9 @@ export default function PrivacyPage() {
           Cookies
         </h2>
         <p>
-          We use a single HTTP-only cookie (<code>gs_user_id</code>) to
-          maintain your session. This cookie contains only a numeric identifier
-          and no personally identifiable information.
+          We use a single HTTP-only cookie (<code>gs_session</code>) to
+          maintain your session. This cookie contains only an opaque session
+          token and no personally identifiable information.
         </p>
         <h2 className="text-xl font-semibold text-white mt-8">
           Affiliate Links

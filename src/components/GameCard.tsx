@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Game, CollectionStatus } from "@/types";
 import { getComplexityLabel, getComplexityColor } from "@/types";
 
@@ -21,16 +21,10 @@ export default function GameCard({
   size = "md",
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
-  const [status, setStatus] = useState<CollectionStatus>(
-    collectionStatus ?? null
-  );
+  // Use prop directly as source of truth; no local copy needed
+  const status = collectionStatus ?? null;
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  // Sync status when prop changes (S1 fix)
-  useEffect(() => {
-    setStatus(collectionStatus ?? null);
-  }, [collectionStatus]);
 
   async function handleCollection(s: "owned" | "wishlist") {
     setLoading(true);
@@ -39,7 +33,6 @@ export default function GameCard({
       if (status === s) {
         const res = await fetch(`/api/collection?gameId=${game.id}`, { method: "DELETE" });
         if (!res.ok) throw new Error("Failed to update");
-        setStatus(null);
         onCollectionChange?.(game.id, null);
       } else {
         const res = await fetch("/api/collection", {
@@ -48,7 +41,6 @@ export default function GameCard({
           body: JSON.stringify({ gameId: game.id, status: s }),
         });
         if (!res.ok) throw new Error("Failed to update");
-        setStatus(s);
         onCollectionChange?.(game.id, s);
       }
     } catch {

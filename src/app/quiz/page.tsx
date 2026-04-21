@@ -154,30 +154,28 @@ function clearPersistedState() {
   }
 }
 
+const DEFAULT_QUIZ_STATE: QuizState = {
+  gameRatings: {},
+  playerCount: "",
+  duration: "",
+  complexity: "",
+  themes: [],
+};
+
 export default function QuizPage() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [quizState, setQuizState] = useState<QuizState>({
-    gameRatings: {},
-    playerCount: "",
-    duration: "",
-    complexity: "",
-    themes: [],
+  const [step, setStep] = useState(() => {
+    const saved = loadPersistedState();
+    return saved ? saved.step : 0;
+  });
+  const [quizState, setQuizState] = useState<QuizState>(() => {
+    const saved = loadPersistedState();
+    return saved ? saved.quizState : DEFAULT_QUIZ_STATE;
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
-  const [hydrated, setHydrated] = useState(false);
-
-  // Restore persisted state on mount
-  useEffect(() => {
-    const saved = loadPersistedState();
-    if (saved) {
-      setStep(saved.step);
-      setQuizState(saved.quizState);
-    }
-    setHydrated(true);
-  }, []);
+  const [hydrated] = useState(() => typeof window !== "undefined");
 
   // Persist state on changes (after hydration)
   useEffect(() => {
