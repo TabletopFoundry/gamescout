@@ -102,6 +102,15 @@ export function getComplexityLabel(c: number): string {
   return COMPLEXITY_LABELS[String(Math.round(c))] || "Medium";
 }
 
+// Canonical complexity bucketing used for charts and stats
+export function getComplexityBucket(c: number): string {
+  if (c < 1.5) return "Light";
+  if (c < 2.5) return "Medium-Light";
+  if (c < 3.5) return "Medium";
+  if (c < 4.5) return "Medium-Heavy";
+  return "Heavy";
+}
+
 export function getComplexityColor(c: number): string {
   if (c < 2) return "text-emerald-400";
   if (c < 3) return "text-yellow-400";

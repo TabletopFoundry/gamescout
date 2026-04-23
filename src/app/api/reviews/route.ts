@@ -25,13 +25,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "Review body exceeds 5000 character limit" }, { status: 400 });
   }
 
-  db.prepare(`
-    INSERT INTO reviews (user_id, game_id, rating, body)
-    VALUES (@userId, @gameId, @rating, @body)
-    ON CONFLICT(user_id, game_id) DO UPDATE SET rating = excluded.rating, body = excluded.body
-  `).run({ userId, gameId, rating, body: reviewBody ? sanitizeText(reviewBody) : null });
+  try {
+    db.prepare(`
+      INSERT INTO reviews (user_id, game_id, rating, body)
+      VALUES (@userId, @gameId, @rating, @body)
+      ON CONFLICT(user_id, game_id) DO UPDATE SET rating = excluded.rating, body = excluded.body
+    `).run({ userId, gameId, rating, body: reviewBody ? sanitizeText(reviewBody) : null });
 
-  return Response.json({ ok: true });
+    return Response.json({ ok: true });
+  } catch {
+    return Response.json({ error: "Failed to save review" }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {
@@ -43,9 +47,13 @@ export async function GET(request: Request) {
     return Response.json({ error: "gameId required" }, { status: 400 });
   }
 
-  const reviews = db
-    .prepare(`SELECT id, user_id, game_id, rating, body, created_at FROM reviews WHERE game_id = ? ORDER BY created_at DESC`)
-    .all(gameId) as ReviewRow[];
+  try {
+    const reviews = db
+      .prepare(`SELECT id, user_id, game_id, rating, body, created_at FROM reviews WHERE game_id = ? ORDER BY created_at DESC`)
+      .all(gameId) as ReviewRow[];
 
-  return Response.json({ reviews });
+    return Response.json({ reviews });
+  } catch {
+    return Response.json({ error: "Failed to load reviews" }, { status: 500 });
+  }
 }

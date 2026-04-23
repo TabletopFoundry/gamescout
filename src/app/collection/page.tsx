@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import EmptyState from "@/components/EmptyState";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
 import type { CollectionItem, PlayLog } from "@/types";
 
@@ -20,6 +21,10 @@ export default function CollectionPage() {
   const [playLogs, setPlayLogs] = useState<PlayLog[]>([]);
   const [playLogsLoading, setPlayLogsLoading] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+
+  // Confirmation dialog state
+  const [confirmRemove, setConfirmRemove] = useState<{ gameId: number; gameName: string } | null>(null);
+  const [confirmDeleteLog, setConfirmDeleteLog] = useState<{ id: number; gameName: string } | null>(null);
 
   const loadCollection = useCallback(async () => {
     setLoading(true);
@@ -60,8 +65,12 @@ export default function CollectionPage() {
   async function removeItem(gameId: number) {
     setRemoving((prev) => ({ ...prev, [gameId]: true }));
     try {
-      await fetch(`/api/collection?gameId=${gameId}`, { method: "DELETE" });
+      const res = await fetch(`/api/collection?gameId=${gameId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to remove");
       setItems((prev) => prev.filter((i) => i.game.id !== gameId));
+    } catch {
+      setMutationError("Failed to remove game. Please try again.");
+      setTimeout(() => setMutationError(null), 3000);
     } finally {
       setRemoving((prev) => ({ ...prev, [gameId]: false }));
     }
@@ -164,19 +173,25 @@ export default function CollectionPage() {
                   className="flex items-center gap-4 p-3 bg-zinc-800 rounded-xl"
                 >
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-700 shrink-0 relative">
-                    <Image
-                      src={log.thumbnail_url}
-                      alt={log.game_name}
-                      fill
-                      className="object-cover"
-                      sizes="40px"
-                      onError={() =>
-                        setImgErrors((prev) => ({
-                          ...prev,
-                          [log.id]: true,
-                        }))
-                      }
-                    />
+                    {!imgErrors[log.id] ? (
+                      <Image
+                        src={log.thumbnail_url}
+                        alt={log.game_name}
+                        fill
+                        className="object-cover"
+                        sizes="40px"
+                        onError={() =>
+                          setImgErrors((prev) => ({
+                            ...prev,
+                            [log.id]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xl">
+                        🎲
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -212,7 +227,7 @@ export default function CollectionPage() {
                     )}
                   </div>
                   <button
-                    onClick={() => deletePlayLog(log.id)}
+                    onClick={() => setConfirmDeleteLog({ id: log.id, gameName: log.game_name })}
                     className="text-xs text-zinc-600 hover:text-red-400 transition-colors shrink-0"
                     aria-label={`Delete play log for ${log.game_name}`}
                   >
@@ -366,7 +381,7 @@ export default function CollectionPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => removeItem(game.id)}
+                  onClick={() => setConfirmRemove({ gameId: game.id, gameName: game.name })}
                   disabled={removing[game.id]}
                   className="text-xs py-1.5 px-2 rounded-md bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-colors"
                   aria-label={`Remove ${game.name} from collection`}
@@ -379,6 +394,30 @@ export default function CollectionPage() {
         </div>
       )}
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title="Remove from Collection"
+        message={`Are you sure you want to remove "${confirmRemove?.gameName}" from your collection? This cannot be undone.`}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (confirmRemove) removeItem(confirmRemove.gameId);
+          setConfirmRemove(null);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteLog !== null}
+        title="Delete Play Log"
+        message={`Are you sure you want to delete this play log for "${confirmDeleteLog?.gameName}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (confirmDeleteLog) deletePlayLog(confirmDeleteLog.id);
+          setConfirmDeleteLog(null);
+        }}
+        onCancel={() => setConfirmDeleteLog(null)}
+      />
     </div>
   );
 }

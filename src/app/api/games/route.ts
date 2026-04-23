@@ -15,50 +15,54 @@ export async function GET(request: NextRequest) {
   const maxPlaytime = Number(searchParams.get("maxPlaytime") || 9999);
   const limit = Math.min(Number(searchParams.get("limit") || 50), 100);
 
-  let rows: GameRow[];
+  // Build SQL WHERE clauses dynamically so filters run in the DB, not post-LIMIT JS
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
 
   if (q) {
-    // Escape SQL LIKE wildcard characters to prevent wildcard injection
     const escaped = q.replace(/[%_\\]/g, "\\$&");
-    rows = db
-      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games WHERE name LIKE ? ESCAPE '\\' ORDER BY bgg_rank ASC LIMIT ?`)
-      .all(`%${escaped}%`, limit) as GameRow[];
-  } else {
-    rows = db
-      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC LIMIT ?`)
-      .all(limit) as GameRow[];
+    conditions.push(`name LIKE ? ESCAPE '\\'`);
+    params.push(`%${escaped}%`);
   }
 
-  let games = rows.map(parseGame);
-
-  // Filter by category
   if (category) {
-    games = games.filter((g) =>
-      g.categories.some((c) => c.toLowerCase().includes(category.toLowerCase()))
-    );
+    conditions.push(`categories LIKE ? ESCAPE '\\'`);
+    const escapedCat = category.replace(/[%_\\]/g, "\\$&");
+    params.push(`%${escapedCat}%`);
   }
 
-  // Filter by mechanic
   if (mechanic) {
-    games = games.filter((g) =>
-      g.mechanics.some((m) => m.toLowerCase().includes(mechanic.toLowerCase()))
-    );
+    conditions.push(`mechanics LIKE ? ESCAPE '\\'`);
+    const escapedMech = mechanic.replace(/[%_\\]/g, "\\$&");
+    params.push(`%${escapedMech}%`);
   }
 
-  // Filter by player count
   if (minPlayers > 0) {
-    games = games.filter((g) => g.max_players >= minPlayers);
+    conditions.push(`max_players >= ?`);
+    params.push(minPlayers);
   }
 
-  // Filter by complexity
   if (maxComplexity < 5) {
-    games = games.filter((g) => g.complexity <= maxComplexity);
+    conditions.push(`complexity <= ?`);
+    params.push(maxComplexity);
   }
 
-  // Filter by playtime
   if (maxPlaytime < 9999) {
-    games = games.filter((g) => g.min_playtime <= maxPlaytime);
+    conditions.push(`min_playtime <= ?`);
+    params.push(maxPlaytime);
   }
 
-  return Response.json({ games, total: games.length });
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  try {
+    const rows = db
+      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ${whereClause} ORDER BY bgg_rank ASC LIMIT ?`)
+      .all(...params, limit) as GameRow[];
+
+    const games = rows.map(parseGame);
+
+    return Response.json({ games, total: games.length });
+  } catch {
+    return Response.json({ error: "Failed to search games" }, { status: 500 });
+  }
 }

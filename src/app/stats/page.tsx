@@ -2,23 +2,25 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+import dynamic from "next/dynamic";
 import type { PlayLog } from "@/types";
+import { getComplexityBucket } from "@/types";
 import { SummaryCards } from "./_components/SummaryCards";
 import { RecentPlaysTable } from "./_components/RecentPlaysTable";
+
+const StatsCharts = dynamic(() => import("./_components/StatsCharts"), {
+  ssr: false,
+  loading: () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 animate-pulse h-64"
+        />
+      ))}
+    </div>
+  ),
+});
 
 interface Stats {
   totalPlays: number;
@@ -36,15 +38,6 @@ interface StatsCollectionItem {
   };
   status: "owned" | "wishlist";
 }
-
-const COLORS = [
-  "#34d399",
-  "#60a5fa",
-  "#f472b6",
-  "#fbbf24",
-  "#a78bfa",
-  "#fb923c",
-];
 
 export default function StatsPage() {
   const [logs, setLogs] = useState<PlayLog[]>([]);
@@ -123,21 +116,11 @@ export default function StatsPage() {
         }))
     : [];
 
-  // Complexity distribution
-  const complexityBuckets: Record<string, number> = {
-    Light: 0,
-    "Med-Light": 0,
-    Medium: 0,
-    "Med-Heavy": 0,
-    Heavy: 0,
-  };
+  // Complexity distribution using shared bucketing
+  const complexityBuckets: Record<string, number> = {};
   for (const item of ownedGames) {
-    const c = item.game.complexity;
-    if (c < 1.5) complexityBuckets["Light"]++;
-    else if (c < 2.5) complexityBuckets["Med-Light"]++;
-    else if (c < 3.5) complexityBuckets["Medium"]++;
-    else if (c < 4.5) complexityBuckets["Med-Heavy"]++;
-    else complexityBuckets["Heavy"]++;
+    const bucket = getComplexityBucket(item.game.complexity);
+    complexityBuckets[bucket] = (complexityBuckets[bucket] || 0) + 1;
   }
   const complexityData = Object.entries(complexityBuckets)
     .filter(([, count]) => count > 0)
@@ -214,167 +197,12 @@ export default function StatsPage() {
         avgRating={avgRating}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Plays by Month */}
-        {monthChartData.length > 0 && (
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">
-              Plays Per Month
-            </h2>
-            <div role="img" aria-label={`Bar chart showing plays per month: ${monthChartData.map(d => `${d.month}: ${d.plays}`).join(', ')}`}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={monthChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#18181b",
-                    border: "1px solid #3f3f46",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-                <Bar dataKey="plays" fill="#34d399" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Complexity Distribution */}
-        {complexityData.length > 0 && (
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">
-              Collection by Complexity
-            </h2>
-            <div role="img" aria-label={`Pie chart showing complexity distribution: ${complexityData.map(d => `${d.name}: ${d.value}`).join(', ')}`}>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={complexityData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  labelLine={false}
-                >
-                  {complexityData.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#18181b",
-                    border: "1px solid #3f3f46",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Category Distribution */}
-        {categoryData.length > 0 && (
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">
-              Top Categories in Collection
-            </h2>
-            <div role="img" aria-label={`Bar chart showing top categories: ${categoryData.map(d => `${d.name}: ${d.value}`).join(', ')}`}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={categoryData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-                <XAxis
-                  type="number"
-                  tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#18181b",
-                    border: "1px solid #3f3f46",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-                <Bar dataKey="value" fill="#60a5fa" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Recent Ratings */}
-        {ratedLogs.length > 0 && (
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">
-              Recent Play Ratings
-            </h2>
-            <div role="img" aria-label={`Line chart showing recent play ratings: ${ratedLogs.map(d => `${d.name}: ${d.rating}/10`).join(', ')}`}>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={ratedLogs}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 10]}
-                  tick={{ fill: "#a1a1aa", fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#18181b",
-                    border: "1px solid #3f3f46",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="rating"
-                  stroke="#fbbf24"
-                  strokeWidth={2}
-                  dot={{ fill: "#fbbf24", r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </div>
+      <StatsCharts
+        monthChartData={monthChartData}
+        complexityData={complexityData}
+        categoryData={categoryData}
+        ratedLogs={ratedLogs}
+      />
 
       {/* Most Played Games */}
       {stats && stats.mostPlayed.length > 0 && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { GamePlayLog } from "@/types";
 
 interface PlayLogSectionProps {
@@ -39,6 +40,54 @@ export function PlayLogSection({
   onLogNotesChange,
   onSubmitLog,
 }: PlayLogSectionProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  // Focus trap and restore for modal
+  useEffect(() => {
+    if (!showLogForm) return;
+
+    // Remember the element that triggered the modal
+    triggerRef.current = document.activeElement as HTMLElement;
+
+    // Move focus into the modal on open
+    const firstInput = modalRef.current?.querySelector<HTMLElement>("input, button, textarea");
+    firstInput?.focus();
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onShowLogForm(false);
+        return;
+      }
+
+      if (e.key !== "Tab" || !modalRef.current) return;
+
+      const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+        'input, button, textarea, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableElements.length === 0) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      // Restore focus to trigger element on close
+      triggerRef.current?.focus();
+    };
+  }, [showLogForm, onShowLogForm]);
+
   return (
     <>
       {/* Play Logs List */}
@@ -99,11 +148,8 @@ export function PlayLogSection({
           onClick={(e) => {
             if (e.target === e.currentTarget) onShowLogForm(false);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onShowLogForm(false);
-          }}
         >
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6 w-full max-w-md">
+          <div ref={modalRef} className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-white mb-4">
               Log a Play — {gameName}
             </h2>

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -13,6 +13,65 @@ const navLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+
+  const closeMobileNav = useCallback(() => {
+    setMobileOpen(false);
+    toggleButtonRef.current?.focus();
+  }, []);
+
+  // Focus trap and Escape handler for mobile nav
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        closeMobileNav();
+        return;
+      }
+
+      if (e.key !== "Tab" || !mobileNavRef.current) return;
+
+      const focusableElements = mobileNavRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableElements.length === 0) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        mobileNavRef.current &&
+        !mobileNavRef.current.contains(e.target as Node) &&
+        !toggleButtonRef.current?.contains(e.target as Node)
+      ) {
+        closeMobileNav();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+
+    // Move focus to first nav link on open
+    const firstLink = mobileNavRef.current?.querySelector<HTMLElement>("a[href]");
+    firstLink?.focus();
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [mobileOpen, closeMobileNav]);
 
   return (
     <nav className="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur border-b border-zinc-800">
@@ -50,6 +109,7 @@ export default function Navbar() {
               Take Quiz
             </Link>
             <button
+              ref={toggleButtonRef}
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
               aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
@@ -69,14 +129,19 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile nav - collapsible */}
+      {/* Mobile nav - collapsible with focus trap */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-zinc-800 px-4 py-3 space-y-1">
+        <div
+          ref={mobileNavRef}
+          className="md:hidden border-t border-zinc-800 px-4 py-3 space-y-1"
+          role="navigation"
+          aria-label="Mobile navigation"
+        >
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => closeMobileNav()}
               aria-current={pathname === link.href ? "page" : undefined}
               className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 pathname === link.href

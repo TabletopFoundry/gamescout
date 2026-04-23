@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { RatingValue } from "@/types";
 import { GameRatingStep } from "./_components/GameRatingStep";
@@ -164,14 +164,9 @@ const DEFAULT_QUIZ_STATE: QuizState = {
 
 export default function QuizPage() {
   const router = useRouter();
-  const [step, setStep] = useState(() => {
-    const saved = loadPersistedState();
-    return saved ? saved.step : 0;
-  });
-  const [quizState, setQuizState] = useState<QuizState>(() => {
-    const saved = loadPersistedState();
-    return saved ? saved.quizState : DEFAULT_QUIZ_STATE;
-  });
+  const persisted = useMemo(() => loadPersistedState(), []);
+  const [step, setStep] = useState(persisted?.step ?? 0);
+  const [quizState, setQuizState] = useState<QuizState>(persisted?.quizState ?? DEFAULT_QUIZ_STATE);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});

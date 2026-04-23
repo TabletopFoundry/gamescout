@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { DetailSkeleton } from "@/components/LoadingSkeleton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import GameCard from "@/components/GameCard";
 import type { GameDetailData, CollectionStatus } from "@/types";
 import { GameHero } from "./_components/GameHero";
@@ -48,6 +49,7 @@ export default function GameDetailPage({
   const [alertSubmitting, setAlertSubmitting] = useState(false);
   const [alertSet, setAlertSet] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [pendingRemoveStatus, setPendingRemoveStatus] = useState<"owned" | "wishlist" | null>(null);
 
   const loadCollectionStatuses = useCallback(async () => {
     try {
@@ -96,19 +98,36 @@ export default function GameDetailPage({
   }
 
   async function handleCollection(status: "owned" | "wishlist") {
+    // If toggling off (removing), require confirmation
+    if (collectionStatus === status) {
+      setPendingRemoveStatus(status);
+      return;
+    }
+    await performCollectionUpdate(status);
+  }
+
+  async function performCollectionUpdate(status: "owned" | "wishlist") {
     setCollectionLoading(true);
+    const previousStatus = collectionStatus;
     try {
       if (collectionStatus === status) {
-        await fetch(`/api/collection?gameId=${id}`, { method: "DELETE" });
+        const res = await fetch(`/api/collection?gameId=${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to remove from collection");
         setCollectionStatus(null);
       } else {
-        await fetch("/api/collection", {
+        const res = await fetch("/api/collection", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ gameId: Number(id), status }),
         });
+        if (!res.ok) throw new Error("Failed to update collection");
         setCollectionStatus(status);
       }
+    } catch {
+      // Rollback on failure
+      setCollectionStatus(previousStatus);
+      setMutationError("Failed to update collection. Please try again.");
+      setTimeout(() => setMutationError(null), 3000);
     } finally {
       setCollectionLoading(false);
     }
@@ -307,6 +326,18 @@ export default function GameDetailPage({
           </div>
         </section>
       )}
+
+      <ConfirmDialog
+        open={pendingRemoveStatus !== null}
+        title="Remove from Collection"
+        message={`Are you sure you want to remove "${game.name}" from your collection?`}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingRemoveStatus) performCollectionUpdate(pendingRemoveStatus);
+          setPendingRemoveStatus(null);
+        }}
+        onCancel={() => setPendingRemoveStatus(null)}
+      />
     </div>
   );
 }

@@ -28,6 +28,9 @@ export async function POST(request: Request) {
 
   const { gameRatings, preferences } = body;
 
+  const VALID_RATINGS = new Set(["loved", "liked", "neutral", "disliked", "havent_played"]);
+  const VALID_PREF_KEYS = new Set(["player_count", "duration", "complexity", "themes"]);
+
   const upsertGameRating = db.prepare(`
     INSERT INTO quiz_answers (user_id, game_id, rating)
     VALUES (@userId, @gameId, @rating)
@@ -43,17 +46,25 @@ export async function POST(request: Request) {
   const save = db.transaction(() => {
     if (gameRatings) {
       for (const gr of gameRatings) {
+        if (!Number.isInteger(gr.gameId) || gr.gameId <= 0) continue;
+        if (!VALID_RATINGS.has(gr.rating)) continue;
         upsertGameRating.run({ userId, gameId: gr.gameId, rating: gr.rating });
       }
     }
     if (preferences) {
       for (const pref of preferences) {
+        if (!VALID_PREF_KEYS.has(pref.key)) continue;
+        if (typeof pref.value !== "string" || pref.value.length > 200) continue;
         upsertPref.run({ userId, key: pref.key, value: pref.value });
       }
     }
   });
 
-  save();
+  try {
+    save();
+  } catch {
+    return Response.json({ error: "Failed to save quiz results" }, { status: 500 });
+  }
 
   return Response.json({ ok: true });
 }
