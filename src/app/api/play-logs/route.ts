@@ -1,3 +1,11 @@
+/**
+ * Play log API.
+ *
+ * GET    — List all play logs with derived stats (totals, most-played, monthly breakdown).
+ * POST   — Record a new play session.
+ * DELETE — Remove a play log by `id`.
+ */
+
 import { getDb, type PlayLogRow } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { sanitizeText } from "@/lib/sanitize";
@@ -26,10 +34,12 @@ export async function GET() {
     // Most played game
     const playCounts: Record<number, { count: number; name: string }> = {};
     for (const log of logs) {
-      if (!playCounts[log.game_id]) {
-        playCounts[log.game_id] = { count: 0, name: log.game_name };
+      const existing = playCounts[log.game_id];
+      if (!existing) {
+        playCounts[log.game_id] = { count: 1, name: log.game_name };
+      } else {
+        existing.count++;
       }
-      playCounts[log.game_id].count++;
     }
     const mostPlayed = Object.entries(playCounts)
       .sort((a, b) => b[1].count - a[1].count)

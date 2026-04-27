@@ -1,3 +1,11 @@
+/**
+ * Price alert API.
+ *
+ * GET    — List active price alerts for the current user.
+ * POST   — Create or update a price alert for a game.
+ * DELETE — Deactivate a price alert by `gameId` (soft-delete).
+ */
+
 import { getDb } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 

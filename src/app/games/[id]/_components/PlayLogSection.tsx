@@ -69,6 +69,7 @@ export function PlayLogSection({
 
       const first = focusableElements[0];
       const last = focusableElements[focusableElements.length - 1];
+      if (!first || !last) return;
 
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lint:types": "tsc --noEmit",
+    "check": "npm run lint && npm run lint:types"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",

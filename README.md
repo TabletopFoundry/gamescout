@@ -62,7 +62,8 @@ src/
 │       ├── recommendations/      # Personalized recommendations
 │       ├── reviews/              # Game reviews
 │       ├── play-logs/            # Play history
-│       └── price-alerts/         # Deal alert subscriptions
+│       ├── price-alerts/         # Deal alert subscriptions
+│       └── health/               # Service health check
 ├── components/                   # Shared UI components
 ├── data/games.ts                 # 55 real board games seed data
 ├── lib/
@@ -119,6 +120,8 @@ The database includes 55 real board games spanning all complexity levels:
 | `npm run build` | Create optimized production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint checks |
+| `npm run lint:types` | TypeScript type checking (`tsc --noEmit`) |
+| `npm run check` | Run both lint and type check |
 
 ## 🤝 Contributing
 

@@ -1,3 +1,10 @@
+/**
+ * Game search and browse API.
+ *
+ * GET — Search/filter the game catalog by name, category, mechanic,
+ *        player count, complexity, and playtime. All filtering runs in SQL.
+ */
+
 import { NextRequest } from "next/server";
 import { getDb, parseGame, type GameRow, GAME_LIST_COLUMNS } from "@/lib/db";
 

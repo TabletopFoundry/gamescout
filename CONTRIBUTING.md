@@ -27,12 +27,14 @@ Open [http://localhost:3000](http://localhost:3000). The SQLite database is crea
 
 ### Available Scripts
 
-| Command         | Description                        |
-| --------------- | ---------------------------------- |
-| `npm run dev`   | Start development server           |
-| `npm run build` | Production build                   |
-| `npm run start` | Start production server            |
-| `npm run lint`  | Run ESLint (Next.js + TypeScript)  |
+| Command             | Description                          |
+| ------------------- | ------------------------------------ |
+| `npm run dev`       | Start development server             |
+| `npm run build`     | Production build                     |
+| `npm run start`     | Start production server              |
+| `npm run lint`      | Run ESLint (Next.js + TypeScript)    |
+| `npm run lint:types`| Run TypeScript type-checking         |
+| `npm run check`     | Run both lint and type check         |
 
 ## Project Architecture
 
@@ -72,7 +74,7 @@ src/
 
 1. Create a feature branch: `git checkout -b feat/my-feature`
 2. Make your changes
-3. Run lint: `npm run lint`
+3. Run lint: `npm run check`
 4. Run build: `npm run build`
 5. Commit with a descriptive message
 6. Open a PR with a clear description of what changed and why

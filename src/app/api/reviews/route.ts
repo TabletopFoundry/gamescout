@@ -1,3 +1,10 @@
+/**
+ * Game reviews API.
+ *
+ * GET  — List reviews for a game by `gameId`.
+ * POST — Create or update (upsert) the current user's review for a game.
+ */
+
 import { getDb, type ReviewRow } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { sanitizeText } from "@/lib/sanitize";

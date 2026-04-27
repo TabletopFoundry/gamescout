@@ -1,3 +1,9 @@
+/**
+ * Personalised recommendations API.
+ *
+ * GET — Return scored game recommendations and the user's taste profile.
+ */
+
 import { getRecommendations, buildTasteProfile } from "@/lib/recommendations";
 import { getUserId } from "@/lib/session";
 

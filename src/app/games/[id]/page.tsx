@@ -34,7 +34,7 @@ export default function GameDetailPage({
   // Play log form state
   const [showLogForm, setShowLogForm] = useState(false);
   const [logDate, setLogDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0] ?? ""
   );
   const [logPlayers, setLogPlayers] = useState("");
   const [logWinner, setLogWinner] = useState("");
@@ -173,7 +173,7 @@ export default function GameDetailPage({
       });
       if (!res.ok) throw new Error("Failed to log play");
       setShowLogForm(false);
-      setLogDate(new Date().toISOString().split("T")[0]);
+      setLogDate(new Date().toISOString().split("T")[0] ?? "");
       setLogPlayers("");
       setLogWinner("");
       setLogRating("");

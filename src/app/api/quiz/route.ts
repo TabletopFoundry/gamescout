@@ -1,15 +1,26 @@
+/**
+ * Quiz answers API.
+ *
+ * GET  — Retrieve saved quiz answers for the current user.
+ * POST — Bulk-save game ratings and preference answers.
+ */
+
 import { getDb } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
-  const userId = await getUserId();
-  const answers = db
-    .prepare(`SELECT id, user_id, game_id, rating, preference_key, preference_value, created_at FROM quiz_answers WHERE user_id = ?`)
-    .all(userId);
-  return Response.json({ answers });
+  try {
+    const db = getDb();
+    const userId = await getUserId();
+    const answers = db
+      .prepare(`SELECT id, user_id, game_id, rating, preference_key, preference_value, created_at FROM quiz_answers WHERE user_id = ?`)
+      .all(userId);
+    return Response.json({ answers });
+  } catch {
+    return Response.json({ error: "Failed to load quiz answers" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

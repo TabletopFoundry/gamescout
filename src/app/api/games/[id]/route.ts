@@ -1,3 +1,10 @@
+/**
+ * Game detail API.
+ *
+ * GET — Fetch a single game with prices, reviews, similar games,
+ *        collection status, average review score, and play logs.
+ */
+
 import { getDb, parseGame, type GameRow, type PriceRow, type ReviewRow, GAME_COLUMNS, GAME_LIST_COLUMNS } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 

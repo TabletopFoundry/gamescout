@@ -1,3 +1,11 @@
+/**
+ * Collection CRUD API.
+ *
+ * GET    — List all collection items (owned + wishlist) for the current user.
+ * POST   — Add or update a game in the collection (upsert).
+ * DELETE — Remove a game from the collection by `gameId`.
+ */
+
 import { getDb, parseGame, type GameRow, type CollectionRow } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 

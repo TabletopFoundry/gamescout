@@ -1,5 +1,12 @@
-// Shared types used across the application
+/**
+ * Shared TypeScript interfaces and helpers used across the application.
+ *
+ * @module
+ */
 
+// ─── Domain types ────────────────────────────────────────────────────────────
+
+/** A board game from the catalog. */
 export interface Game {
   id: number;
   name: string;
@@ -20,8 +27,10 @@ export interface Game {
   thumbnail_url: string;
 }
 
+/** Whether a game is in the user's collection, and in what capacity. */
 export type CollectionStatus = "owned" | "wishlist" | null;
 
+/** A game in the user's collection (owned or wishlist) with full game data. */
 export interface CollectionItem {
   collectionId: number;
   status: "owned" | "wishlist";
@@ -29,6 +38,7 @@ export interface CollectionItem {
   game: Game;
 }
 
+/** A logged play session with game metadata. */
 export interface PlayLog {
   id: number;
   game_id: number;
@@ -41,6 +51,7 @@ export interface PlayLog {
   notes: string | null;
 }
 
+/** A play log entry scoped to a single game (no game metadata). */
 export interface GamePlayLog {
   id: number;
   played_at: string;
@@ -50,6 +61,7 @@ export interface GamePlayLog {
   notes: string | null;
 }
 
+/** A retailer price entry for a game. */
 export interface PriceInfo {
   id: number;
   retailer: string;
@@ -58,6 +70,7 @@ export interface PriceInfo {
   updated_at: string;
 }
 
+/** A user review for a game. */
 export interface Review {
   id: number;
   rating: number;
@@ -66,6 +79,7 @@ export interface Review {
   username: string;
 }
 
+/** Possible quiz rating values for a game. */
 export type RatingValue =
   | "loved"
   | "liked"
@@ -73,12 +87,14 @@ export type RatingValue =
   | "disliked"
   | "havent_played";
 
+/** A game with its recommendation score and human-readable reason. */
 export interface RecommendedGame {
   game: Game;
   score: number;
   reason: string;
 }
 
+/** Full data payload returned by the game detail API. */
 export interface GameDetailData {
   game: Game;
   prices: PriceInfo[];
@@ -89,7 +105,9 @@ export interface GameDetailData {
   playLogs: GamePlayLog[];
 }
 
-// Complexity color/label helpers (shared across components)
+// ─── Complexity helpers (shared across components) ───────────────────────────
+
+/** Human-readable labels for integer complexity levels (1-5). */
 const COMPLEXITY_LABELS: Record<string, string> = {
   "1": "Light",
   "2": "Medium-Light",
@@ -98,11 +116,13 @@ const COMPLEXITY_LABELS: Record<string, string> = {
   "5": "Heavy",
 };
 
+/** Map a numeric complexity (1-5) to a human label like "Medium-Heavy". */
 export function getComplexityLabel(c: number): string {
   return COMPLEXITY_LABELS[String(Math.round(c))] || "Medium";
 }
 
 // Canonical complexity bucketing used for charts and stats
+/** Bucket a numeric complexity value into one of five named tiers. */
 export function getComplexityBucket(c: number): string {
   if (c < 1.5) return "Light";
   if (c < 2.5) return "Medium-Light";
@@ -111,6 +131,7 @@ export function getComplexityBucket(c: number): string {
   return "Heavy";
 }
 
+/** Return a Tailwind color class appropriate for a complexity value. */
 export function getComplexityColor(c: number): string {
   if (c < 2) return "text-emerald-400";
   if (c < 3) return "text-yellow-400";
