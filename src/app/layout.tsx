@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
@@ -46,13 +47,13 @@ export default function RootLayout({
         <footer className="border-t border-zinc-800 py-6 text-center text-xs text-zinc-600">
           © {new Date().getFullYear()} GameScout · Prices shown are for
           informational purposes only. We may earn a commission on purchases. ·{" "}
-          <a href="/privacy" className="hover:text-zinc-400">
+          <Link href="/privacy" className="hover:text-zinc-400">
             Privacy
-          </a>{" "}
+          </Link>{" "}
           ·{" "}
-          <a href="/terms" className="hover:text-zinc-400">
+          <Link href="/terms" className="hover:text-zinc-400">
             Terms
-          </a>
+          </Link>
         </footer>
       </body>
     </html>

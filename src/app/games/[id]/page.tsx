@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { DetailSkeleton } from "@/components/LoadingSkeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -51,25 +51,49 @@ export default function GameDetailPage({
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [pendingRemoveStatus, setPendingRemoveStatus] = useState<"owned" | "wishlist" | null>(null);
 
-  const loadCollectionStatuses = useCallback(async () => {
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mutationReloadRef = useRef<AbortController | null>(null);
+
+  // Clear error timer on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      mutationReloadRef.current?.abort();
+    };
+  }, []);
+
+  function reloadGameAfterMutation() {
+    mutationReloadRef.current?.abort();
+    const controller = new AbortController();
+    mutationReloadRef.current = controller;
+    void loadGame(controller.signal);
+  }
+
+  function setTimedError(msg: string) {
+    setMutationError(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setMutationError(null), 3000);
+  }
+
+  const loadCollectionStatuses = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/collection");
+      const res = await fetch("/api/collection", { signal });
       const data = await res.json();
       const statuses: Record<number, CollectionStatus> = {};
       for (const item of data.items || []) {
         statuses[item.game.id] = item.status;
       }
       setSimilarStatuses(statuses);
-    } catch {
-      // non-critical
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
     }
   }, []);
 
-  const loadGame = useCallback(async () => {
+  const loadGame = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/games/${id}`);
+      const res = await fetch(`/api/games/${id}`, { signal });
       if (!res.ok) {
         if (res.status === 404) throw new Error("Game not found");
         throw new Error("Failed to load game");
@@ -78,19 +102,24 @@ export default function GameDetailPage({
       setData(d);
       setCollectionStatus(d.collectionStatus);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Failed to load game");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      void loadGame();
-      void loadCollectionStatuses();
+      void loadGame(controller.signal);
+      void loadCollectionStatuses(controller.signal);
     }, 0);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [loadGame, loadCollectionStatuses]);
 
   function handleSimilarCollectionChange(gameId: number, status: CollectionStatus) {
@@ -126,8 +155,7 @@ export default function GameDetailPage({
     } catch {
       // Rollback on failure
       setCollectionStatus(previousStatus);
-      setMutationError("Failed to update collection. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to update collection. Please try again.");
     } finally {
       setCollectionLoading(false);
     }
@@ -147,10 +175,9 @@ export default function GameDetailPage({
       });
       if (!res.ok) throw new Error("Failed to post review");
       setShowReviewForm(false);
-      loadGame();
+      reloadGameAfterMutation();
     } catch {
-      setMutationError("Failed to save review. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to save review. Please try again.");
     } finally {
       setReviewSubmitting(false);
     }
@@ -178,10 +205,9 @@ export default function GameDetailPage({
       setLogWinner("");
       setLogRating("");
       setLogNotes("");
-      loadGame();
+      reloadGameAfterMutation();
     } catch {
-      setMutationError("Failed to save play log. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to save play log. Please try again.");
     } finally {
       setLogSubmitting(false);
     }
@@ -203,8 +229,7 @@ export default function GameDetailPage({
       setShowAlertForm(false);
       setAlertSet(true);
     } catch {
-      setMutationError("Failed to set price alert. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to set price alert. Please try again.");
     } finally {
       setAlertSubmitting(false);
     }

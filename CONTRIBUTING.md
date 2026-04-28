@@ -13,7 +13,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/gamescout.git
+git clone <this-repository-url>
 cd gamescout
 
 # 2. Install dependencies

@@ -47,24 +47,31 @@ export default function StatsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     Promise.all([
-      fetch("/api/play-logs").then((r) => {
+      fetch("/api/play-logs", { signal }).then((r) => {
         if (!r.ok) throw new Error("Failed to load play logs");
         return r.json();
       }),
-      fetch("/api/collection").then((r) => {
+      fetch("/api/collection", { signal }).then((r) => {
         if (!r.ok) throw new Error("Failed to load collection");
         return r.json();
       }),
     ]).then(([playData, collData]) => {
+      if (signal.aborted) return;
       setLogs(playData.logs || []);
       setStats(playData.stats);
       setCollection(collData.items || []);
       setLoading(false);
     }).catch((e) => {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Failed to load stats data");
       setLoading(false);
     });
+
+    return () => controller.abort();
   }, []);
 
   if (loading) {

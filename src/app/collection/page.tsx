@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
+import GameCard from "@/components/GameCard";
 import type { CollectionItem, PlayLog } from "@/types";
 
 export default function CollectionPage() {
@@ -26,39 +27,66 @@ export default function CollectionPage() {
   const [confirmRemove, setConfirmRemove] = useState<{ gameId: number; gameName: string } | null>(null);
   const [confirmDeleteLog, setConfirmDeleteLog] = useState<{ id: number; gameName: string } | null>(null);
 
-  const loadCollection = useCallback(async () => {
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playLogsControllerRef = useRef<AbortController | null>(null);
+
+  // Clear timers and abort pending requests on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      playLogsControllerRef.current?.abort();
+    };
+  }, []);
+
+  function setTimedError(msg: string) {
+    setMutationError(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setMutationError(null), 3000);
+  }
+
+  const loadCollection = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/collection");
+      const res = await fetch("/api/collection", { signal });
       if (!res.ok) throw new Error("Failed to load collection");
       const data = await res.json();
       setItems(data.items || []);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       console.error("Failed to load collection");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      void loadCollection();
+      void loadCollection(controller.signal);
     }, 0);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [loadCollection]);
 
   async function loadPlayLogs() {
+    playLogsControllerRef.current?.abort();
+    const controller = new AbortController();
+    playLogsControllerRef.current = controller;
+
     setPlayLogsLoading(true);
     try {
-      const res = await fetch("/api/play-logs");
+      const res = await fetch("/api/play-logs", { signal: controller.signal });
       if (!res.ok) throw new Error("Failed to load play logs");
       const data = await res.json();
       setPlayLogs(data.logs || []);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       console.error("Failed to load play logs");
     } finally {
-      setPlayLogsLoading(false);
+      if (!controller.signal.aborted) setPlayLogsLoading(false);
     }
   }
 
@@ -69,8 +97,7 @@ export default function CollectionPage() {
       if (!res.ok) throw new Error("Failed to remove");
       setItems((prev) => prev.filter((i) => i.game.id !== gameId));
     } catch {
-      setMutationError("Failed to remove game. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to remove game. Please try again.");
     } finally {
       setRemoving((prev) => ({ ...prev, [gameId]: false }));
     }
@@ -90,8 +117,7 @@ export default function CollectionPage() {
         )
       );
     } catch {
-      setMutationError("Failed to move game. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to move game. Please try again.");
     }
   }
 
@@ -101,8 +127,7 @@ export default function CollectionPage() {
       if (!res.ok) throw new Error("Failed to delete");
       setPlayLogs((prev) => prev.filter((l) => l.id !== id));
     } catch {
-      setMutationError("Failed to delete play log. Please try again.");
-      setTimeout(() => setMutationError(null), 3000);
+      setTimedError("Failed to delete play log. Please try again.");
     }
   }
 
@@ -320,76 +345,16 @@ export default function CollectionPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {sortedItems.map(({ game, status, addedAt }) => (
-            <div key={game.id} className="group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all duration-200 flex flex-col">
-              <Link href={`/games/${game.id}`} className="block">
-                <div className="relative h-48 overflow-hidden bg-zinc-800">
-                  {!imgErrors[game.id] ? (
-                    <Image
-                      src={game.thumbnail_url}
-                      alt={game.name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={() =>
-                        setImgErrors((prev) => ({ ...prev, [game.id]: true }))
-                      }
-                      sizes="(max-width: 768px) 50vw, 20vw"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">
-                      🎲
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/80 to-transparent" />
-                  <div className="absolute top-2 right-2 text-xs font-bold">
-                    {status === "owned" ? (
-                      <span className="bg-emerald-500 text-black px-2 py-0.5 rounded-full">
-                        Owned
-                      </span>
-                    ) : (
-                      <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full">
-                        Wishlist
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="p-3">
-                  <h3 className="font-semibold text-white text-sm leading-tight line-clamp-2 mb-1">
-                    {game.name}
-                  </h3>
-                  <p className="text-xs text-zinc-500">
-                    Added {new Date(addedAt).toLocaleDateString()}
-                  </p>
-                  <div className="mt-1 flex gap-2 text-xs text-zinc-400">
-                    <span>★ {game.bgg_rating.toFixed(1)}</span>
-                    <span>·</span>
-                    <span>
-                      {game.min_players === game.max_players
-                        ? game.min_players
-                        : `${game.min_players}-${game.max_players}`}{" "}
-                      players
-                    </span>
-                  </div>
-                </div>
-              </Link>
-              <div className="px-3 pb-3 flex gap-2 mt-auto">
-                {status === "wishlist" && (
-                  <button
-                    onClick={() => moveToOwned(game.id)}
-                    className="flex-1 text-xs py-1.5 rounded-md bg-emerald-500 text-black font-medium hover:bg-emerald-400 transition-colors"
-                  >
-                    → Move to Owned
-                  </button>
-                )}
-                <button
-                  onClick={() => setConfirmRemove({ gameId: game.id, gameName: game.name })}
-                  disabled={removing[game.id]}
-                  className="text-xs py-1.5 px-2 rounded-md bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-colors"
-                  aria-label={`Remove ${game.name} from collection`}
-                >
-                  {removing[game.id] ? "..." : "✕"}
-                </button>
-              </div>
-            </div>
+            <GameCard
+              key={game.id}
+              game={game}
+              size="sm"
+              collectionStatus={status}
+              addedAt={addedAt}
+              onRemove={(id) => setConfirmRemove({ gameId: id, gameName: game.name })}
+              onMoveToOwned={status === "wishlist" ? () => moveToOwned(game.id) : undefined}
+              removing={removing[game.id]}
+            />
           ))}
         </div>
       )}

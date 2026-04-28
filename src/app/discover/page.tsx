@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import GameCard from "@/components/GameCard";
@@ -34,43 +34,73 @@ function DiscoverContent() {
     Record<number, CollectionStatus>
   >({});
 
+  const refreshControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    loadRecommendations();
-    loadCollection();
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/recommendations", { signal });
+        if (!res.ok) throw new Error("Failed to load");
+        const data = await res.json();
+        setRecommendations(data.recommendations || []);
+        setProfile(data.profile);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setError("Failed to load recommendations. Please try again.");
+      } finally {
+        if (!signal.aborted) setLoading(false);
+      }
+    }
+
+    async function loadColl() {
+      try {
+        const res = await fetch("/api/collection", { signal });
+        if (!res.ok) throw new Error("Failed to load collection");
+        const data = await res.json();
+        const statuses: Record<number, "owned" | "wishlist"> = {};
+        for (const item of data.items || []) {
+          statuses[item.game.id] = item.status;
+        }
+        setCollectionStatuses(statuses);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        console.error("Failed to load collection statuses");
+      }
+    }
+
+    void load();
+    void loadColl();
+
+    return () => controller.abort();
   }, []);
 
-  async function loadRecommendations() {
+  async function refreshRecommendations() {
+    refreshControllerRef.current?.abort();
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/recommendations");
+      const res = await fetch("/api/recommendations", { signal: controller.signal });
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       setRecommendations(data.recommendations || []);
       setProfile(data.profile);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError("Failed to load recommendations. Please try again.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }
 
-  async function loadCollection() {
-    try {
-      const res = await fetch("/api/collection");
-      if (!res.ok) throw new Error("Failed to load collection");
-      const data = await res.json();
-      const statuses: Record<number, "owned" | "wishlist"> = {};
-      for (const item of data.items || []) {
-        statuses[item.game.id] = item.status;
-      }
-      setCollectionStatuses(statuses);
-    } catch {
-      console.error("Failed to load collection statuses");
-    }
-  }
-
-  const loadBrowse = useCallback(async () => {
+  const loadBrowse = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({ limit: "50" });
@@ -79,7 +109,7 @@ function DiscoverContent() {
     if (maxPlaytime > 0) params.set("maxPlaytime", String(maxPlaytime));
 
     try {
-      const res = await fetch(`/api/games?${params}`);
+      const res = await fetch(`/api/games?${params}`, { signal });
       if (!res.ok) throw new Error("Failed to load games");
       const data = await res.json();
       let games: Game[] = data.games || [];
@@ -109,43 +139,55 @@ function DiscoverContent() {
       }
 
       setBrowseGames(games);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError("Failed to load games. Please try again.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [maxComplexity, maxPlaytime, minPlayers, selectedMood]);
 
-  const handleSearch = useCallback(async () => {
+  const handleSearch = useCallback(async (signal?: AbortSignal) => {
     if (!searchQuery.trim()) return;
     setSearchLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/games?q=${encodeURIComponent(searchQuery)}&limit=50`);
+      const res = await fetch(`/api/games?q=${encodeURIComponent(searchQuery)}&limit=50`, { signal });
       if (!res.ok) throw new Error("Failed to search games");
       const data = await res.json();
       setSearchResults(data.games || []);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError("Search failed. Please try again.");
     } finally {
-      setSearchLoading(false);
+      if (!signal?.aborted) setSearchLoading(false);
     }
   }, [searchQuery]);
 
   useEffect(() => {
     if (tab !== "browse") return;
 
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      void loadBrowse();
+      void loadBrowse(controller.signal);
     }, 0);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [tab, loadBrowse]);
 
   useEffect(() => {
     if (tab !== "search") return;
-    const t = setTimeout(handleSearch, 400);
-    return () => clearTimeout(t);
+    const controller = new AbortController();
+    const t = setTimeout(() => {
+      void handleSearch(controller.signal);
+    }, 400);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
   }, [searchQuery, tab, handleSearch]);
 
   function handleCollectionChange(
@@ -294,7 +336,7 @@ function DiscoverContent() {
       {error && (
         <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6 text-red-400" role="alert">
           {error}
-          <button onClick={loadRecommendations} className="ml-2 underline">
+          <button onClick={refreshRecommendations} className="ml-2 underline">
             Retry
           </button>
         </div>
@@ -310,7 +352,7 @@ function DiscoverContent() {
                 {recommendations.length} personalized picks
               </p>
               <button
-                onClick={loadRecommendations}
+                onClick={refreshRecommendations}
                 className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 ↻ Refresh

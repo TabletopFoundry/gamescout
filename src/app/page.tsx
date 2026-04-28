@@ -30,13 +30,18 @@ const HIGHLIGHTS = [
 ];
 
 export default function HomePage() {
-  // Load top 6 games server-side for the showcase
-  const db = getDb();
-  const topGames = (
-    db
-      .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC LIMIT 6`)
-      .all() as GameRow[]
-  ).map(parseGame);
+  // Load top 6 games server-side for the showcase, with fallback on DB error
+  let topGames: ReturnType<typeof parseGame>[] = [];
+  try {
+    const db = getDb();
+    topGames = (
+      db
+        .prepare(`SELECT ${GAME_LIST_COLUMNS} FROM games ORDER BY bgg_rank ASC LIMIT 6`)
+        .all() as GameRow[]
+    ).map(parseGame);
+  } catch {
+    // Fall back to empty array — showcase section will simply be empty
+  }
 
   return (
     <div className="flex flex-col">
