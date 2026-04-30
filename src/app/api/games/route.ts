@@ -5,7 +5,7 @@
  *        player count, complexity, and playtime. All filtering runs in SQL.
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { getDb, parseGame, type GameRow, GAME_LIST_COLUMNS } from "@/lib/db";
 
 export const dynamic = "force-dynamic";

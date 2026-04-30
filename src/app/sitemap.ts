@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getDb, type GameRow } from "@/lib/db";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+const BASE_URL = process.env["NEXT_PUBLIC_BASE_URL"] || "http://localhost:3000";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes: MetadataRoute.Sitemap = [
