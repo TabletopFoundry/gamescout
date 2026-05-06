@@ -13,10 +13,10 @@ import { sanitizeText } from "@/lib/sanitize";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
-  const userId = await getUserId();
-
   try {
+    const db = getDb();
+    const userId = await getUserId();
+
     const logs = db
       .prepare(
         `SELECT pl.id, pl.user_id, pl.game_id, pl.played_at, pl.players, pl.winner, pl.rating, pl.notes, pl.created_at, g.name as game_name, g.thumbnail_url
@@ -62,37 +62,40 @@ export async function GET() {
         playsByMonth,
       },
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to load play logs" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-
-  let body: {
-    gameId: number;
-    playedAt: string;
-    players?: number;
-    winner?: string;
-    rating?: number;
-    notes?: string;
-  };
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const db = getDb();
+    const userId = await getUserId();
 
-  const { gameId, playedAt, players, winner, rating, notes } = body;
+    let body: {
+      gameId: number;
+      playedAt: string;
+      players?: number;
+      winner?: string;
+      rating?: number;
+      notes?: string;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!gameId || !playedAt || !dateRegex.test(playedAt) || isNaN(Date.parse(playedAt))) {
-    return Response.json({ error: "gameId and valid playedAt date (YYYY-MM-DD) required" }, { status: 400 });
-  }
+    const { gameId, playedAt, players, winner, rating, notes } = body;
 
-  try {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!gameId || !playedAt || !dateRegex.test(playedAt) || isNaN(Date.parse(playedAt))) {
+      return Response.json({ error: "gameId and valid playedAt date (YYYY-MM-DD) required" }, { status: 400 });
+    }
+
     const result = db
       .prepare(
         `INSERT INTO play_logs (user_id, game_id, played_at, players, winner, rating, notes)
@@ -109,26 +112,32 @@ export async function POST(request: Request) {
       });
 
     return Response.json({ ok: true, id: result.lastInsertRowid });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to save play log" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-  const { searchParams } = new URL(request.url);
-  const id = Number(searchParams.get("id"));
-
-  if (Number.isNaN(id) || id <= 0) {
-    return Response.json({ error: "id required" }, { status: 400 });
-  }
-
   try {
+    const db = getDb();
+    const userId = await getUserId();
+    const { searchParams } = new URL(request.url);
+    const id = Number(searchParams.get("id"));
+
+    if (Number.isNaN(id) || id <= 0) {
+      return Response.json({ error: "id required" }, { status: 400 });
+    }
+
     db.prepare(`DELETE FROM play_logs WHERE id = ? AND user_id = ?`).run(id, userId);
 
     return Response.json({ ok: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to delete play log" }, { status: 500 });
   }
 }

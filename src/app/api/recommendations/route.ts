@@ -16,6 +16,9 @@ export async function GET() {
     const profile = buildTasteProfile(userId);
     return Response.json({ recommendations, profile });
   } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     console.error(e);
     return Response.json({ error: "Failed to load recommendations" }, { status: 500 });
   }

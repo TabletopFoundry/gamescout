@@ -12,10 +12,10 @@ import { getUserId } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
-  const userId = await getUserId();
-
   try {
+    const db = getDb();
+    const userId = await getUserId();
+
     const rows = db
       .prepare(
         `SELECT c.id, c.user_id, c.game_id, c.status, c.added_at,
@@ -55,29 +55,32 @@ export async function GET() {
     }));
 
     return Response.json({ items });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to load collection" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-
-  let body: { gameId: number; status: "owned" | "wishlist" };
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const db = getDb();
+    const userId = await getUserId();
 
-  const { gameId, status } = body;
+    let body: { gameId: number; status: "owned" | "wishlist" };
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  if (!gameId || !["owned", "wishlist"].includes(status)) {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
-  }
+    const { gameId, status } = body;
 
-  try {
+    if (!gameId || !["owned", "wishlist"].includes(status)) {
+      return Response.json({ error: "Invalid request" }, { status: 400 });
+    }
+
     db.prepare(`
       INSERT INTO collection (user_id, game_id, status)
       VALUES (@userId, @gameId, @status)
@@ -85,26 +88,32 @@ export async function POST(request: Request) {
     `).run({ userId, gameId, status });
 
     return Response.json({ ok: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to update collection" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-  const { searchParams } = new URL(request.url);
-  const gameId = Number(searchParams.get("gameId"));
-
-  if (Number.isNaN(gameId) || gameId <= 0) {
-    return Response.json({ error: "gameId required" }, { status: 400 });
-  }
-
   try {
+    const db = getDb();
+    const userId = await getUserId();
+    const { searchParams } = new URL(request.url);
+    const gameId = Number(searchParams.get("gameId"));
+
+    if (Number.isNaN(gameId) || gameId <= 0) {
+      return Response.json({ error: "gameId required" }, { status: 400 });
+    }
+
     db.prepare(`DELETE FROM collection WHERE user_id = ? AND game_id = ?`).run(userId, gameId);
 
     return Response.json({ ok: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to remove from collection" }, { status: 500 });
   }
 }

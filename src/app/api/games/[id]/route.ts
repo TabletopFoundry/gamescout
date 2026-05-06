@@ -15,10 +15,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const db = getDb();
-  const userId = await getUserId();
 
   try {
+    const db = getDb();
+    const userId = await getUserId();
+
     const gameRow = db
       .prepare(`SELECT ${GAME_COLUMNS} FROM games WHERE id = ?`)
       .get(Number(id)) as GameRow | undefined;
@@ -87,7 +88,10 @@ export async function GET(
       avgReview,
       playLogs,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to load game details" }, { status: 500 });
   }
 }

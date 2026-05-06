@@ -12,9 +12,9 @@ import { getUserId } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
-  const userId = await getUserId();
   try {
+    const db = getDb();
+    const userId = await getUserId();
     const alerts = db
       .prepare(
         `SELECT pa.id, pa.user_id, pa.game_id, pa.target_price, pa.email, pa.active, pa.created_at,
@@ -25,60 +25,69 @@ export async function GET() {
       )
       .all(userId);
     return Response.json({ alerts });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to load price alerts" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-
-  let body: { gameId: number; targetPrice: number; email?: string };
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const db = getDb();
+    const userId = await getUserId();
 
-  const { gameId, targetPrice, email } = body;
+    let body: { gameId: number; targetPrice: number; email?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  if (!gameId || typeof targetPrice !== "number" || targetPrice <= 0) {
-    return Response.json({ error: "gameId and a positive targetPrice are required" }, { status: 400 });
-  }
+    const { gameId, targetPrice, email } = body;
 
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return Response.json({ error: "Invalid email format" }, { status: 400 });
-  }
+    if (!gameId || typeof targetPrice !== "number" || targetPrice <= 0) {
+      return Response.json({ error: "gameId and a positive targetPrice are required" }, { status: 400 });
+    }
 
-  try {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Response.json({ error: "Invalid email format" }, { status: 400 });
+    }
+
     db.prepare(`
       INSERT INTO price_alerts (user_id, game_id, target_price, email)
       VALUES (@userId, @gameId, @targetPrice, @email)
       ON CONFLICT(user_id, game_id) DO UPDATE SET target_price = excluded.target_price, email = excluded.email, active = 1
     `).run({ userId, gameId, targetPrice, email: email || null });
-  } catch {
+
+    return Response.json({ ok: true });
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to create price alert" }, { status: 500 });
   }
-
-  return Response.json({ ok: true });
 }
 
 export async function DELETE(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-  const { searchParams } = new URL(request.url);
-  const gameId = Number(searchParams.get("gameId"));
-
-  if (Number.isNaN(gameId) || gameId <= 0) {
-    return Response.json({ error: "gameId required" }, { status: 400 });
-  }
-
   try {
+    const db = getDb();
+    const userId = await getUserId();
+    const { searchParams } = new URL(request.url);
+    const gameId = Number(searchParams.get("gameId"));
+
+    if (Number.isNaN(gameId) || gameId <= 0) {
+      return Response.json({ error: "gameId required" }, { status: 400 });
+    }
+
     db.prepare(`UPDATE price_alerts SET active = 0 WHERE user_id = ? AND game_id = ?`).run(userId, gameId);
-  } catch {
+
+    return Response.json({ ok: true });
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to delete price alert" }, { status: 500 });
   }
-
-  return Response.json({ ok: true });
 }

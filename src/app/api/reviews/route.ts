@@ -12,27 +12,27 @@ import { sanitizeText } from "@/lib/sanitize";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const db = getDb();
-  const userId = await getUserId();
-
-  let body: { gameId: number; rating: number; body?: string };
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const db = getDb();
+    const userId = await getUserId();
 
-  const { gameId, rating, body: reviewBody } = body;
+    let body: { gameId: number; rating: number; body?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  if (!gameId || !rating || rating < 1 || rating > 10) {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
-  }
+    const { gameId, rating, body: reviewBody } = body;
 
-  if (reviewBody && reviewBody.length > 5000) {
-    return Response.json({ error: "Review body exceeds 5000 character limit" }, { status: 400 });
-  }
+    if (!gameId || !rating || rating < 1 || rating > 10) {
+      return Response.json({ error: "Invalid request" }, { status: 400 });
+    }
 
-  try {
+    if (reviewBody && reviewBody.length > 5000) {
+      return Response.json({ error: "Review body exceeds 5000 character limit" }, { status: 400 });
+    }
+
     db.prepare(`
       INSERT INTO reviews (user_id, game_id, rating, body)
       VALUES (@userId, @gameId, @rating, @body)
@@ -40,7 +40,10 @@ export async function POST(request: Request) {
     `).run({ userId, gameId, rating, body: reviewBody ? sanitizeText(reviewBody) : null });
 
     return Response.json({ ok: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "RateLimitError") {
+      return Response.json({ error: e.message }, { status: 429 });
+    }
     return Response.json({ error: "Failed to save review" }, { status: 500 });
   }
 }
