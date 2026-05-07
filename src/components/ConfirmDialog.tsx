@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -23,9 +23,15 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!open) return;
+
+    triggerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
 
     // Focus the cancel button (safer default) on open
     cancelButtonRef.current?.focus();
@@ -55,7 +61,10 @@ export default function ConfirmDialog({
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      triggerRef.current?.focus();
+    };
   }, [open, onCancel]);
 
   if (!open) return null;
@@ -66,13 +75,14 @@ export default function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      aria-describedby={descriptionId}
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div ref={dialogRef} className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6 w-full max-w-sm">
         <h2 className="text-lg font-bold text-white mb-2">{title}</h2>
-        <p className="text-zinc-400 text-sm mb-6">{message}</p>
+        <p id={descriptionId} className="text-zinc-400 text-sm mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
             ref={cancelButtonRef}

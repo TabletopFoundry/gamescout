@@ -5,9 +5,10 @@
  * POST — Create or update (upsert) the current user's review for a game.
  */
 
-import { getDb, type ReviewRow } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { sanitizeText } from "@/lib/sanitize";
+import type { Review } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     const db = getDb();
     const userId = await getUserId();
 
-    let body: { gameId: number; rating: number; body?: string };
+    let body: { gameId?: unknown; rating?: unknown; body?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -25,19 +26,33 @@ export async function POST(request: Request) {
 
     const { gameId, rating, body: reviewBody } = body;
 
-    if (!gameId || !rating || rating < 1 || rating > 10) {
+    if (
+      typeof gameId !== "number" ||
+      !Number.isInteger(gameId) ||
+      gameId <= 0 ||
+      typeof rating !== "number" ||
+      !Number.isInteger(rating) ||
+      rating < 1 ||
+      rating > 10 ||
+      (reviewBody !== undefined && reviewBody !== null && typeof reviewBody !== "string")
+    ) {
       return Response.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    if (reviewBody && reviewBody.length > 5000) {
+    if (typeof reviewBody === "string" && reviewBody.length > 5000) {
       return Response.json({ error: "Review body exceeds 5000 character limit" }, { status: 400 });
     }
+
+    const sanitizedReviewBody =
+      typeof reviewBody === "string" && reviewBody.length > 0
+        ? sanitizeText(reviewBody)
+        : null;
 
     db.prepare(`
       INSERT INTO reviews (user_id, game_id, rating, body)
       VALUES (@userId, @gameId, @rating, @body)
       ON CONFLICT(user_id, game_id) DO UPDATE SET rating = excluded.rating, body = excluded.body
-    `).run({ userId, gameId, rating, body: reviewBody ? sanitizeText(reviewBody) : null });
+    `).run({ userId, gameId, rating, body: sanitizedReviewBody });
 
     return Response.json({ ok: true });
   } catch (e) {
@@ -49,7 +64,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const db = getDb();
   const { searchParams } = new URL(request.url);
   const gameId = Number(searchParams.get("gameId"));
 
@@ -58,9 +72,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    const db = getDb();
     const reviews = db
-      .prepare(`SELECT id, user_id, game_id, rating, body, created_at FROM reviews WHERE game_id = ? ORDER BY created_at DESC`)
-      .all(gameId) as ReviewRow[];
+      .prepare(
+        `SELECT r.id, r.rating, r.body, r.created_at, u.username
+         FROM reviews r
+         JOIN users u ON u.id = r.user_id
+         WHERE r.game_id = ?
+         ORDER BY r.created_at DESC`
+      )
+      .all(gameId) as Review[];
 
     return Response.json({ reviews });
   } catch {

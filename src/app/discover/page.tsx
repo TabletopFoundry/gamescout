@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import GameCard from "@/components/GameCard";
@@ -8,6 +9,8 @@ import { GridSkeleton } from "@/components/LoadingSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { MOODS } from "@/lib/moods";
 import type { Game, RecommendedGame, CollectionStatus } from "@/types";
+
+const DISCOVER_TABS = ["recommended", "browse", "search"] as const;
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -22,6 +25,7 @@ function DiscoverContent() {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorSource, setErrorSource] = useState<"recommended" | "browse" | "search" | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
@@ -36,26 +40,32 @@ function DiscoverContent() {
 
   const refreshControllerRef = useRef<AbortController | null>(null);
 
+  const refreshRecommendations = useCallback(async () => {
+    refreshControllerRef.current?.abort();
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
+
+    setLoading(true);
+    setError(null);
+    setErrorSource(null);
+    try {
+      const res = await fetch("/api/recommendations", { signal: controller.signal });
+      if (!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      setRecommendations(data.recommendations || []);
+      setProfile(data.profile);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError("Failed to load recommendations. Please try again.");
+      setErrorSource("recommended");
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/recommendations", { signal });
-        if (!res.ok) throw new Error("Failed to load");
-        const data = await res.json();
-        setRecommendations(data.recommendations || []);
-        setProfile(data.profile);
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        setError("Failed to load recommendations. Please try again.");
-      } finally {
-        if (!signal.aborted) setLoading(false);
-      }
-    }
 
     async function loadColl() {
       try {
@@ -73,36 +83,22 @@ function DiscoverContent() {
       }
     }
 
-    void load();
+    const refreshTimer = setTimeout(() => {
+      void refreshRecommendations();
+    }, 0);
     void loadColl();
 
-    return () => controller.abort();
-  }, []);
-
-  async function refreshRecommendations() {
-    refreshControllerRef.current?.abort();
-    const controller = new AbortController();
-    refreshControllerRef.current = controller;
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/recommendations", { signal: controller.signal });
-      if (!res.ok) throw new Error("Failed to load");
-      const data = await res.json();
-      setRecommendations(data.recommendations || []);
-      setProfile(data.profile);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError("Failed to load recommendations. Please try again.");
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }
+    return () => {
+      clearTimeout(refreshTimer);
+      refreshControllerRef.current?.abort();
+      controller.abort();
+    };
+  }, [refreshRecommendations]);
 
   const loadBrowse = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
+    setErrorSource(null);
     const params = new URLSearchParams({ limit: "50" });
     if (minPlayers > 0) params.set("minPlayers", String(minPlayers));
     if (maxComplexity < 5) params.set("maxComplexity", String(maxComplexity));
@@ -142,6 +138,7 @@ function DiscoverContent() {
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       setError("Failed to load games. Please try again.");
+      setErrorSource("browse");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -149,8 +146,10 @@ function DiscoverContent() {
 
   const handleSearch = useCallback(async (signal?: AbortSignal) => {
     if (!searchQuery.trim()) return;
+
     setSearchLoading(true);
     setError(null);
+    setErrorSource(null);
     try {
       const res = await fetch(`/api/games?q=${encodeURIComponent(searchQuery)}&limit=50`, { signal });
       if (!res.ok) throw new Error("Failed to search games");
@@ -159,10 +158,27 @@ function DiscoverContent() {
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       setError("Search failed. Please try again.");
+      setErrorSource("search");
     } finally {
       if (!signal?.aborted) setSearchLoading(false);
     }
   }, [searchQuery]);
+
+  const retryCurrentError = useCallback(() => {
+    if (errorSource === "recommended") {
+      void refreshRecommendations();
+      return;
+    }
+
+    if (errorSource === "browse") {
+      void loadBrowse();
+      return;
+    }
+
+    if (errorSource === "search") {
+      void handleSearch();
+    }
+  }, [errorSource, handleSearch, loadBrowse, refreshRecommendations]);
 
   useEffect(() => {
     if (tab !== "browse") return;
@@ -197,6 +213,29 @@ function DiscoverContent() {
     setCollectionStatuses((prev) => ({ ...prev, [gameId]: status }));
   }
 
+  function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const currentIndex = DISCOVER_TABS.indexOf(tab);
+    let nextTab: (typeof DISCOVER_TABS)[number] | undefined;
+
+    if (event.key === "ArrowRight") {
+      nextTab = DISCOVER_TABS[(currentIndex + 1) % DISCOVER_TABS.length];
+    } else if (event.key === "ArrowLeft") {
+      nextTab = DISCOVER_TABS[(currentIndex - 1 + DISCOVER_TABS.length) % DISCOVER_TABS.length];
+    } else if (event.key === "Home") {
+      nextTab = DISCOVER_TABS[0];
+    } else if (event.key === "End") {
+      nextTab = DISCOVER_TABS[DISCOVER_TABS.length - 1];
+    } else {
+      return;
+    }
+
+    if (!nextTab) return;
+
+    event.preventDefault();
+    setTab(nextTab);
+    document.getElementById(`tab-${nextTab}`)?.focus();
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
@@ -210,14 +249,20 @@ function DiscoverContent() {
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Discover navigation" className="flex gap-1 mb-6 bg-zinc-900 rounded-xl p-1 max-w-sm">
-        {(["recommended", "browse", "search"] as const).map((t) => (
+      <div
+        role="tablist"
+        aria-label="Discover navigation"
+        onKeyDown={handleTabKeyDown}
+        className="flex gap-1 mb-6 bg-zinc-900 rounded-xl p-1 max-w-sm"
+      >
+        {DISCOVER_TABS.map((t) => (
           <button
             key={t}
             role="tab"
             aria-selected={tab === t}
             aria-controls={`tabpanel-${t}`}
             id={`tab-${t}`}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
               tab === t
@@ -333,18 +378,23 @@ function DiscoverContent() {
       )}
 
       {/* Content */}
-      {error && (
-        <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6 text-red-400" role="alert">
-          {error}
-          <button onClick={refreshRecommendations} className="ml-2 underline">
-            Retry
-          </button>
-        </div>
-      )}
+      <div
+        role="tabpanel"
+        id={`tabpanel-${tab}`}
+        aria-labelledby={`tab-${tab}`}
+      >
+        {error && (
+          <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6 text-red-400" role="alert">
+            {error}
+            <button onClick={retryCurrentError} className="ml-2 underline">
+              Retry
+            </button>
+          </div>
+        )}
 
-      {loading ? (
-        <GridSkeleton count={12} />
-      ) : tab === "recommended" ? (
+        {loading ? (
+          <GridSkeleton count={12} />
+        ) : tab === "recommended" ? (
         recommendations.length > 0 ? (
           <>
             <div className="flex items-center justify-between mb-4">
@@ -434,6 +484,7 @@ function DiscoverContent() {
           description="Type a game name to search our catalog of 55+ board games."
         />
       )}
+      </div>
     </div>
   );
 }

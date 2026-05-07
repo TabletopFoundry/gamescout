@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Game, CollectionStatus } from "@/types";
 import { getComplexityLabel, getComplexityColor } from "@/types";
 
@@ -37,6 +38,7 @@ export default function GameCard({
   const status = collectionStatus ?? null;
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingRemoveStatus, setPendingRemoveStatus] = useState<"owned" | "wishlist" | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -45,11 +47,11 @@ export default function GameCard({
     };
   }, []);
 
-  async function handleCollection(s: "owned" | "wishlist") {
+  async function updateCollection(s: "owned" | "wishlist", remove = false) {
     setLoading(true);
     setActionError(null);
     try {
-      if (status === s) {
+      if (remove) {
         const res = await fetch(`/api/collection?gameId=${game.id}`, { method: "DELETE" });
         if (!res.ok) throw new Error("Failed to update");
         onCollectionChange?.(game.id, null);
@@ -71,10 +73,28 @@ export default function GameCard({
     }
   }
 
+  async function handleCollection(s: "owned" | "wishlist") {
+    if (status === s) {
+      setPendingRemoveStatus(s);
+      return;
+    }
+
+    await updateCollection(s);
+  }
+
+  async function confirmRemoval() {
+    if (!pendingRemoveStatus) return;
+
+    const statusToRemove = pendingRemoveStatus;
+    setPendingRemoveStatus(null);
+    await updateCollection(statusToRemove, true);
+  }
+
   const isSmall = size === "sm";
 
   return (
-    <div className="group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all duration-200 hover:shadow-lg hover:shadow-black/30 flex flex-col">
+    <>
+      <div className="group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all duration-200 hover:shadow-lg hover:shadow-black/30 flex flex-col">
       {/* Card content as a link — no interactive children inside */}
       <Link href={`/games/${game.id}`} className="block">
         <div
@@ -232,5 +252,17 @@ export default function GameCard({
         )}
       </div>
     </div>
+      <ConfirmDialog
+        open={pendingRemoveStatus !== null}
+        title={`Remove ${game.name}?`}
+        message={pendingRemoveStatus ? `This will remove ${game.name} from your ${pendingRemoveStatus === "owned" ? "owned games" : "wishlist"}.` : ""}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        onConfirm={() => {
+          void confirmRemoval();
+        }}
+        onCancel={() => setPendingRemoveStatus(null)}
+      />
+    </>
   );
 }

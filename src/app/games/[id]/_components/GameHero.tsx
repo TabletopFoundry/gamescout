@@ -160,6 +160,7 @@ function CollectionActions({
       <button
         onClick={() => onCollection("owned")}
         disabled={collectionLoading}
+        aria-pressed={collectionStatus === "owned"}
         className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${
           collectionStatus === "owned"
             ? "bg-emerald-500 text-black"
@@ -173,6 +174,7 @@ function CollectionActions({
       <button
         onClick={() => onCollection("wishlist")}
         disabled={collectionLoading}
+        aria-pressed={collectionStatus === "wishlist"}
         className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${
           collectionStatus === "wishlist"
             ? "bg-purple-500 text-white"

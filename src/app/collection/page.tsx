@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import EmptyState from "@/components/EmptyState";
@@ -8,6 +9,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { GridSkeleton } from "@/components/LoadingSkeleton";
 import GameCard from "@/components/GameCard";
 import type { CollectionItem, PlayLog } from "@/types";
+
+const COLLECTION_TABS = ["owned", "wishlist"] as const;
 
 export default function CollectionPage() {
   const [items, setItems] = useState<CollectionItem[]>([]);
@@ -143,6 +146,29 @@ export default function CollectionPage() {
 
   const ownedCount = items.filter((i) => i.status === "owned").length;
   const wishlistCount = items.filter((i) => i.status === "wishlist").length;
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const currentIndex = COLLECTION_TABS.indexOf(tab);
+    let nextTab: (typeof COLLECTION_TABS)[number] | undefined;
+
+    if (event.key === "ArrowRight") {
+      nextTab = COLLECTION_TABS[(currentIndex + 1) % COLLECTION_TABS.length];
+    } else if (event.key === "ArrowLeft") {
+      nextTab = COLLECTION_TABS[(currentIndex - 1 + COLLECTION_TABS.length) % COLLECTION_TABS.length];
+    } else if (event.key === "Home") {
+      nextTab = COLLECTION_TABS[0];
+    } else if (event.key === "End") {
+      nextTab = COLLECTION_TABS[COLLECTION_TABS.length - 1];
+    } else {
+      return;
+    }
+
+    if (!nextTab) return;
+
+    event.preventDefault();
+    setTab(nextTab);
+    document.getElementById(`tab-${nextTab}`)?.focus();
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -281,12 +307,18 @@ export default function CollectionPage() {
 
       {/* Tabs */}
       <div className="flex items-center justify-between mb-6">
-        <div role="tablist" aria-label="Collection filter" className="flex gap-1 bg-zinc-900 rounded-xl p-1">
+        <div
+          role="tablist"
+          aria-label="Collection filter"
+          onKeyDown={handleTabKeyDown}
+          className="flex gap-1 bg-zinc-900 rounded-xl p-1"
+        >
           <button
             role="tab"
             aria-selected={tab === "owned"}
             aria-controls="tabpanel-collection"
             id="tab-owned"
+            tabIndex={tab === "owned" ? 0 : -1}
             onClick={() => setTab("owned")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === "owned"
@@ -301,6 +333,7 @@ export default function CollectionPage() {
             aria-selected={tab === "wishlist"}
             aria-controls="tabpanel-collection"
             id="tab-wishlist"
+            tabIndex={tab === "wishlist" ? 0 : -1}
             onClick={() => setTab("wishlist")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === "wishlist"

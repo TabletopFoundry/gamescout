@@ -106,6 +106,7 @@ export function PriceComparison({
                   value={alertPrice}
                   onChange={(e) => onAlertPriceChange(e.target.value)}
                   placeholder="Target price ($)"
+                  aria-label="Target price in dollars"
                   className="bg-zinc-900 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm flex-1 min-w-0"
                 />
                 <input
@@ -113,6 +114,7 @@ export function PriceComparison({
                   value={alertEmail}
                   onChange={(e) => onAlertEmailChange(e.target.value)}
                   placeholder="Email (optional)"
+                  aria-label="Notification email (optional)"
                   className="bg-zinc-900 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm flex-1 min-w-0"
                 />
                 <button
