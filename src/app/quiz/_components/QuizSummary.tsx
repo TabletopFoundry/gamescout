@@ -18,6 +18,9 @@ interface QuizState {
 interface QuizSummaryProps {
   quizState: QuizState;
   quizGames: QuizGame[];
+  playerCountLabel: string;
+  durationLabel: string;
+  complexityLabel: string;
   submitting: boolean;
   submitError: string | null;
   onBack: () => void;
@@ -27,6 +30,9 @@ interface QuizSummaryProps {
 export function QuizSummary({
   quizState,
   quizGames,
+  playerCountLabel,
+  durationLabel,
+  complexityLabel,
   submitting,
   submitError,
   onBack,
@@ -52,15 +58,15 @@ export function QuizSummary({
           </div>
           <div>
             <p className="text-zinc-500 mb-1">Group Size</p>
-            <p className="text-white font-medium">{quizState.playerCount || "—"}</p>
+            <p className="text-white font-medium">{quizState.playerCount ? playerCountLabel : "—"}</p>
           </div>
           <div>
             <p className="text-zinc-500 mb-1">Session Length</p>
-            <p className="text-white font-medium">{quizState.duration || "—"}</p>
+            <p className="text-white font-medium">{quizState.duration ? durationLabel : "—"}</p>
           </div>
           <div>
             <p className="text-zinc-500 mb-1">Complexity</p>
-            <p className="text-white font-medium">{quizState.complexity || "—"}</p>
+            <p className="text-white font-medium">{quizState.complexity ? complexityLabel : "—"}</p>
           </div>
         </div>
         {quizState.themes.length > 0 && (

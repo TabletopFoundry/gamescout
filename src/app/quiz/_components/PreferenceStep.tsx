@@ -43,13 +43,13 @@ export function PreferenceStep({
           const label = isObject ? opt.label : opt;
           const desc = isObject ? opt.desc : undefined;
           const selected = multiSelect
-            ? Array.isArray(selectedValue) && selectedValue.includes(label)
-            : selectedValue === (isObject ? label : opt);
+            ? Array.isArray(selectedValue) && selectedValue.includes(value)
+            : selectedValue === value;
 
           return (
             <button
               key={value}
-              onClick={() => onSelect(isObject ? label : opt)}
+              onClick={() => onSelect(value)}
               aria-pressed={multiSelect ? selected : undefined}
               className={`p-${multiSelect ? "3" : "4"} rounded-xl border-2 font-medium ${multiSelect ? "text-sm" : ""} transition-all ${!multiSelect ? "text-left" : ""} ${
                 selected

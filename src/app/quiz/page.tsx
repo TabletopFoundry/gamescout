@@ -100,9 +100,24 @@ const QUIZ_GAMES = [
   },
 ];
 
-const PLAYER_COUNT_OPTIONS = ["1", "2", "2-3", "3-4", "4-6", "6+"];
-const DURATION_OPTIONS = ["< 30 min", "30-60 min", "1-2 hours", "2-3 hours", "3+ hours"];
-const COMPLEXITY_OPTIONS = [
+type QuizOption = { label: string; value: string; desc?: string };
+
+const PLAYER_COUNT_OPTIONS: QuizOption[] = [
+  { label: "Solo", value: "1-1" },
+  { label: "2 players", value: "2-2" },
+  { label: "2-3 players", value: "2-3" },
+  { label: "3-4 players", value: "3-4" },
+  { label: "4-6 players", value: "4-6" },
+  { label: "6+ players", value: "6-99" },
+];
+const DURATION_OPTIONS: QuizOption[] = [
+  { label: "Under 30 min", value: "0-30" },
+  { label: "30-60 min", value: "30-60" },
+  { label: "1-2 hours", value: "60-120" },
+  { label: "2-3 hours", value: "120-180" },
+  { label: "3+ hours", value: "180-999" },
+];
+const COMPLEXITY_OPTIONS: QuizOption[] = [
   { label: "Light", desc: "Easy to learn, quick rules", value: "1-2" },
   { label: "Medium", desc: "Some strategy required", value: "2-3" },
   { label: "Heavy", desc: "Complex rules, deep strategy", value: "3-5" },
@@ -127,12 +142,45 @@ interface PersistedQuizState {
   quizState: QuizState;
 }
 
+const LEGACY_PLAYER_COUNT_MAP: Record<string, string> = {
+  "1": "1-1",
+  "2": "2-2",
+  "6+": "6-99",
+};
+
+const LEGACY_DURATION_MAP: Record<string, string> = {
+  "< 30 min": "0-30",
+  "30-60 min": "30-60",
+  "1-2 hours": "60-120",
+  "2-3 hours": "120-180",
+  "3+ hours": "180-999",
+};
+
+const LEGACY_COMPLEXITY_MAP: Record<string, string> = {
+  Light: "1-2",
+  Medium: "2-3",
+  Heavy: "3-5",
+};
+
+function normalizeQuizState(quizState: QuizState): QuizState {
+  return {
+    ...quizState,
+    playerCount: LEGACY_PLAYER_COUNT_MAP[quizState.playerCount] ?? quizState.playerCount,
+    duration: LEGACY_DURATION_MAP[quizState.duration] ?? quizState.duration,
+    complexity: LEGACY_COMPLEXITY_MAP[quizState.complexity] ?? quizState.complexity,
+  };
+}
+
 function loadPersistedState(): PersistedQuizState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PersistedQuizState;
+    const parsed = JSON.parse(raw) as PersistedQuizState;
+    return {
+      ...parsed,
+      quizState: normalizeQuizState(parsed.quizState),
+    };
   } catch {
     return null;
   }
@@ -161,6 +209,10 @@ const DEFAULT_QUIZ_STATE: QuizState = {
   complexity: "",
   themes: [],
 };
+
+function getOptionLabel(options: QuizOption[], value: string): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
 
 export default function QuizPage() {
   const router = useRouter();
@@ -252,6 +304,9 @@ export default function QuizPage() {
       <QuizSummary
         quizState={quizState}
         quizGames={QUIZ_GAMES}
+        playerCountLabel={getOptionLabel(PLAYER_COUNT_OPTIONS, quizState.playerCount)}
+        durationLabel={getOptionLabel(DURATION_OPTIONS, quizState.duration)}
+        complexityLabel={getOptionLabel(COMPLEXITY_OPTIONS, quizState.complexity)}
         submitting={submitting}
         submitError={submitError}
         onBack={goBack}
