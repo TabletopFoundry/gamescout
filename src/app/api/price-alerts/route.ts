@@ -47,11 +47,12 @@ export async function POST(request: Request) {
 
     const { gameId, targetPrice, email } = body;
 
-    if (!gameId || typeof targetPrice !== "number" || targetPrice <= 0) {
+    if (!Number.isInteger(gameId) || gameId <= 0 || typeof targetPrice !== "number" || !Number.isFinite(targetPrice) || targetPrice <= 0) {
       return Response.json({ error: "gameId and a positive targetPrice are required" }, { status: 400 });
     }
 
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const normalizedEmail = typeof email === "string" ? email.trim() : undefined;
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return Response.json({ error: "Invalid email format" }, { status: 400 });
     }
 
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       INSERT INTO price_alerts (user_id, game_id, target_price, email)
       VALUES (@userId, @gameId, @targetPrice, @email)
       ON CONFLICT(user_id, game_id) DO UPDATE SET target_price = excluded.target_price, email = excluded.email, active = 1
-    `).run({ userId, gameId, targetPrice, email: email || null });
+    `).run({ userId, gameId, targetPrice, email: normalizedEmail || null });
 
     return Response.json({ ok: true });
   } catch (e) {

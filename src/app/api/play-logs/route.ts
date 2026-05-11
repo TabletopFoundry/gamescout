@@ -96,6 +96,25 @@ export async function POST(request: Request) {
       return Response.json({ error: "gameId and valid playedAt date (YYYY-MM-DD) required" }, { status: 400 });
     }
 
+    if (players !== undefined && (!Number.isInteger(players) || players < 1 || players > 20)) {
+      return Response.json({ error: "players must be an integer between 1 and 20" }, { status: 400 });
+    }
+
+    if (rating !== undefined && (!Number.isInteger(rating) || rating < 1 || rating > 10)) {
+      return Response.json({ error: "rating must be an integer between 1 and 10" }, { status: 400 });
+    }
+
+    if (winner !== undefined && typeof winner !== "string") {
+      return Response.json({ error: "winner must be a string" }, { status: 400 });
+    }
+
+    if (notes !== undefined && typeof notes !== "string") {
+      return Response.json({ error: "notes must be a string" }, { status: 400 });
+    }
+
+    const sanitizedWinner = winner ? sanitizeText(winner).slice(0, 100) : null;
+    const sanitizedNotes = notes ? sanitizeText(notes).slice(0, 500) : null;
+
     const result = db
       .prepare(
         `INSERT INTO play_logs (user_id, game_id, played_at, players, winner, rating, notes)
@@ -106,9 +125,9 @@ export async function POST(request: Request) {
         gameId,
         playedAt,
         players: players || null,
-        winner: winner ? sanitizeText(winner) : null,
+        winner: sanitizedWinner,
         rating: rating || null,
-        notes: notes ? sanitizeText(notes) : null,
+        notes: sanitizedNotes,
       });
 
     return Response.json({ ok: true, id: result.lastInsertRowid });

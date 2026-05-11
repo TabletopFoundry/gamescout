@@ -345,15 +345,19 @@ export default function CollectionPage() {
           </button>
         </div>
 
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5 text-sm"
-        >
-          <option value="added">Recently Added</option>
-          <option value="name">Name A-Z</option>
-          <option value="rating">BGG Rating</option>
-        </select>
+        <label className="flex items-center gap-2 text-sm text-zinc-400">
+          <span className="sr-only">Sort collection</span>
+          <select
+            aria-label="Sort collection"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5 text-sm"
+          >
+            <option value="added">Recently Added</option>
+            <option value="name">Name A-Z</option>
+            <option value="rating">BGG Rating</option>
+          </select>
+        </label>
       </div>
 
       {/* Grid */}

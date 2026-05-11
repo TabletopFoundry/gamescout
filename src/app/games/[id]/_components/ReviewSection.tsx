@@ -62,8 +62,12 @@ export function ReviewSection({
             onChange={(e) => onBodyChange(e.target.value)}
             placeholder="Share your thoughts..."
             rows={3}
+            maxLength={5000}
             className="w-full bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-lg px-3 py-2 text-sm resize-none mb-3"
           />
+          <p className="text-xs text-zinc-500 mb-3" aria-live="polite">
+            {reviewBody.length}/5000 characters
+          </p>
           <div className="flex gap-2">
             <button
               onClick={onSubmit}

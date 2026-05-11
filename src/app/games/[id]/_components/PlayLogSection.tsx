@@ -155,66 +155,79 @@ export function PlayLogSection({
               Log a Play — {gameName}
             </h2>
             <div className="space-y-3">
-              <label className="block">
+              <label className="block" htmlFor="play-log-date">
                 <span className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
                   Date Played *
                 </span>
                 <input
+                  id="play-log-date"
                   type="date"
                   value={logDate}
                   onChange={(e) => onLogDateChange(e.target.value)}
+                  autoComplete="off"
                   className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm"
                 />
               </label>
-              <label className="block">
+              <label className="block" htmlFor="play-log-players">
                 <span className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
                   Number of Players
                 </span>
                 <input
+                  id="play-log-players"
                   type="number"
                   value={logPlayers}
                   onChange={(e) => onLogPlayersChange(e.target.value)}
                   placeholder="e.g. 4"
                   min={1}
                   max={20}
+                  step={1}
+                  inputMode="numeric"
                   className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm"
                 />
               </label>
-              <label className="block">
+              <label className="block" htmlFor="play-log-winner">
                 <span className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
                   Winner
                 </span>
                 <input
+                  id="play-log-winner"
                   type="text"
                   value={logWinner}
                   onChange={(e) => onLogWinnerChange(e.target.value)}
                   placeholder="Who won?"
+                  autoComplete="off"
+                  maxLength={100}
                   className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm"
                 />
               </label>
-              <label className="block">
+              <label className="block" htmlFor="play-log-rating">
                 <span className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
                   Your Rating (1-10)
                 </span>
                 <input
+                  id="play-log-rating"
                   type="number"
                   value={logRating}
                   onChange={(e) => onLogRatingChange(e.target.value)}
                   placeholder="e.g. 8"
                   min={1}
                   max={10}
+                  step={1}
+                  inputMode="numeric"
                   className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm"
                 />
               </label>
-              <label className="block">
+              <label className="block" htmlFor="play-log-notes">
                 <span className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
                   Notes
                 </span>
                 <textarea
+                  id="play-log-notes"
                   value={logNotes}
                   onChange={(e) => onLogNotesChange(e.target.value)}
                   placeholder="How did it go?"
                   rows={2}
+                  maxLength={500}
                   className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm resize-none"
                 />
               </label>
