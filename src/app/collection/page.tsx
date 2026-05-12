@@ -24,6 +24,7 @@ export default function CollectionPage() {
   // Play log state
   const [playLogs, setPlayLogs] = useState<PlayLog[]>([]);
   const [playLogsLoading, setPlayLogsLoading] = useState(false);
+  const [playLogsLoaded, setPlayLogsLoaded] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
   // Confirmation dialog state
@@ -85,6 +86,7 @@ export default function CollectionPage() {
       if (!res.ok) throw new Error("Failed to load play logs");
       const data = await res.json();
       setPlayLogs(data.logs || []);
+      setPlayLogsLoaded(true);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       console.error("Failed to load play logs");
@@ -183,8 +185,11 @@ export default function CollectionPage() {
         <div className="flex gap-2">
           <button
             onClick={() => {
-              setShowLogs(!showLogs);
-              if (!playLogs.length) loadPlayLogs();
+              const nextShowLogs = !showLogs;
+              setShowLogs(nextShowLogs);
+              if (nextShowLogs && !playLogsLoaded) {
+                void loadPlayLogs();
+              }
             }}
             className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-sm rounded-lg transition-colors"
           >
@@ -213,7 +218,7 @@ export default function CollectionPage() {
             Recent Play History
           </h2>
           {playLogsLoading ? (
-            <div className="text-zinc-400 text-sm animate-pulse">
+            <div className="text-zinc-400 text-sm animate-pulse" role="status" aria-live="polite">
               Loading...
             </div>
           ) : playLogs.length > 0 ? (

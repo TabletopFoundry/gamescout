@@ -49,24 +49,40 @@ export default function GameDetailPage({
   const [alertSubmitting, setAlertSubmitting] = useState(false);
   const [alertSet, setAlertSet] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationStatus, setMutationStatus] = useState<string | null>(null);
   const [pendingRemoveStatus, setPendingRemoveStatus] = useState<"owned" | "wishlist" | null>(null);
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutationReloadRef = useRef<AbortController | null>(null);
 
   // Clear error timer on unmount
   useEffect(() => {
     return () => {
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
       mutationReloadRef.current?.abort();
     };
   }, []);
 
-  function reloadGameAfterMutation() {
+  function setTimedStatus(msg: string) {
+    setMutationStatus(msg);
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    statusTimerRef.current = setTimeout(() => setMutationStatus(null), 3000);
+  }
+
+  async function reloadGameAfterMutation(successMessage: string) {
     mutationReloadRef.current?.abort();
     const controller = new AbortController();
     mutationReloadRef.current = controller;
-    void loadGame(controller.signal);
+    setMutationStatus(`${successMessage} Refreshing details…`);
+    await Promise.all([
+      loadGame(controller.signal),
+      loadCollectionStatuses(controller.signal),
+    ]);
+    if (!controller.signal.aborted) {
+      setTimedStatus(successMessage);
+    }
   }
 
   function setTimedError(msg: string) {
@@ -175,7 +191,9 @@ export default function GameDetailPage({
       });
       if (!res.ok) throw new Error("Failed to post review");
       setShowReviewForm(false);
-      reloadGameAfterMutation();
+      setReviewRating(7);
+      setReviewBody("");
+      await reloadGameAfterMutation("Review saved.");
     } catch {
       setTimedError("Failed to save review. Please try again.");
     } finally {
@@ -205,7 +223,7 @@ export default function GameDetailPage({
       setLogWinner("");
       setLogRating("");
       setLogNotes("");
-      reloadGameAfterMutation();
+      await reloadGameAfterMutation("Play log saved.");
     } catch {
       setTimedError("Failed to save play log. Please try again.");
     } finally {
@@ -227,7 +245,10 @@ export default function GameDetailPage({
       });
       if (!res.ok) throw new Error("Failed to set alert");
       setShowAlertForm(false);
+      setAlertPrice("");
+      setAlertEmail("");
       setAlertSet(true);
+      setTimedStatus("Deal alert saved.");
     } catch {
       setTimedError("Failed to set price alert. Please try again.");
     } finally {
@@ -270,10 +291,15 @@ export default function GameDetailPage({
         <span className="text-zinc-300 truncate">{game.name}</span>
       </div>
 
-      {/* Mutation error toast */}
+      {/* Mutation feedback */}
       {mutationError && (
         <div className="mb-4 bg-red-900/20 border border-red-800 rounded-xl p-4 text-red-400 text-sm" role="alert">
           {mutationError}
+        </div>
+      )}
+      {mutationStatus && (
+        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-emerald-300 text-sm" role="status" aria-live="polite">
+          {mutationStatus}
         </div>
       )}
 
