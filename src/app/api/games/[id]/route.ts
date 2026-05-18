@@ -5,7 +5,7 @@
  *        collection status, average review score, and play logs.
  */
 
-import { getDb, parseGame, type GameRow, type PriceRow, type ReviewRow, GAME_COLUMNS, GAME_LIST_COLUMNS } from "@/lib/db";
+import { getDb, parseGame, type DealRow, type GameRow, type PriceRow, type ReviewRow, GAME_COLUMNS, GAME_LIST_COLUMNS } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +33,27 @@ export async function GET(
     // Prices
     const prices = db
       .prepare(
-        `SELECT id, game_id, retailer, price, url, updated_at FROM price_history WHERE game_id = ? ORDER BY price ASC`
+        `SELECT ph.id, ph.game_id, ph.retailer, ph.price, ph.url, ph.updated_at
+         FROM price_history ph
+         JOIN (
+           SELECT retailer, MAX(updated_at) AS updated_at
+           FROM price_history
+           WHERE game_id = ?
+           GROUP BY retailer
+         ) latest ON latest.retailer = ph.retailer AND latest.updated_at = ph.updated_at
+         WHERE ph.game_id = ?
+         ORDER BY ph.price ASC`
       )
-      .all(Number(id)) as PriceRow[];
+      .all(Number(id), Number(id)) as PriceRow[];
+
+    const deals = db
+      .prepare(
+        `SELECT id, game_id, retailer, title, sale_price, msrp, discount_pct, url, starts_at, ends_at, coupon_code, featured
+         FROM game_deals
+         WHERE game_id = ?
+         ORDER BY featured DESC, discount_pct DESC, sale_price ASC`
+      )
+      .all(Number(id)) as DealRow[];
 
     // Reviews
     const reviews = db
@@ -75,13 +93,14 @@ export async function GET(
     // Play logs for this game
     const playLogs = db
       .prepare(
-        `SELECT pl.id, pl.played_at, pl.players, pl.winner, pl.rating, pl.notes, g.name as game_name FROM play_logs pl JOIN games g ON pl.game_id = g.id WHERE pl.user_id = ? AND pl.game_id = ? ORDER BY pl.played_at DESC`
+        `SELECT pl.id, pl.played_at, pl.players, pl.winner, pl.rating, pl.score, pl.notes, g.name as game_name FROM play_logs pl JOIN games g ON pl.game_id = g.id WHERE pl.user_id = ? AND pl.game_id = ? ORDER BY pl.played_at DESC`
       )
       .all(userId, Number(id));
 
     return Response.json({
       game,
       prices,
+      deals,
       reviews,
       similar,
       collectionStatus: collectionStatus?.status || null,

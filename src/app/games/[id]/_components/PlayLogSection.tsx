@@ -126,6 +126,11 @@ export function PlayLogSection({
                         ★ {log.rating}/10
                       </span>
                     )}
+                    {log.score !== null && log.score !== undefined && (
+                      <span className="text-xs text-sky-400">
+                        🎯 {log.score} pts
+                      </span>
+                    )}
                   </div>
                   {log.notes && (
                     <p className="text-xs text-zinc-500 mt-1 italic">

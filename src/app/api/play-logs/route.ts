@@ -19,7 +19,7 @@ export async function GET() {
 
     const logs = db
       .prepare(
-        `SELECT pl.id, pl.user_id, pl.game_id, pl.played_at, pl.players, pl.winner, pl.rating, pl.notes, pl.created_at, g.name as game_name, g.thumbnail_url
+        `SELECT pl.id, pl.user_id, pl.game_id, pl.played_at, pl.players, pl.winner, pl.rating, pl.score, pl.notes, pl.created_at, g.name as game_name, g.thumbnail_url
          FROM play_logs pl
          JOIN games g ON pl.game_id = g.id
          WHERE pl.user_id = ?
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       players?: number;
       winner?: string;
       rating?: number;
+      score?: number;
       notes?: string;
     };
     try {
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { gameId, playedAt, players, winner, rating, notes } = body;
+    const { gameId, playedAt, players, winner, rating, score, notes } = body;
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!gameId || !playedAt || !dateRegex.test(playedAt) || isNaN(Date.parse(playedAt))) {
@@ -102,6 +103,10 @@ export async function POST(request: Request) {
 
     if (rating !== undefined && (!Number.isInteger(rating) || rating < 1 || rating > 10)) {
       return Response.json({ error: "rating must be an integer between 1 and 10" }, { status: 400 });
+    }
+
+    if (score !== undefined && (!Number.isInteger(score) || score < 0 || score > 9999)) {
+      return Response.json({ error: "score must be an integer between 0 and 9999" }, { status: 400 });
     }
 
     if (winner !== undefined && typeof winner !== "string") {
@@ -117,8 +122,8 @@ export async function POST(request: Request) {
 
     const result = db
       .prepare(
-        `INSERT INTO play_logs (user_id, game_id, played_at, players, winner, rating, notes)
-         VALUES (@userId, @gameId, @playedAt, @players, @winner, @rating, @notes)`
+        `INSERT INTO play_logs (user_id, game_id, played_at, players, winner, rating, score, notes)
+         VALUES (@userId, @gameId, @playedAt, @players, @winner, @rating, @score, @notes)`
       )
       .run({
         userId,
@@ -127,6 +132,7 @@ export async function POST(request: Request) {
         players: players || null,
         winner: sanitizedWinner,
         rating: rating || null,
+        score: score ?? null,
         notes: sanitizedNotes,
       });
 

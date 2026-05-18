@@ -17,12 +17,12 @@
 | **🎯 Taste Profile Quiz** | Rate 10 well-known games and answer preference questions to build a personalized recommendation engine |
 | **🤖 Personalized Recommendations** | Content-based filtering scores games on complexity, theme, mechanics, and player count match |
 | **🎭 Mood-Based Discovery** | Browse by "Quick Party Game", "Deep Strategy", "Cozy Two-Player", and 5 more moods |
-| **🔍 Search & Filter** | Search 55+ real board games with filters for players, complexity, and playtime |
-| **📋 Game Detail Pages** | Full info, price comparison across retailers, reviews, similar games, play logging |
+| **🔍 Search & Filter** | Search 85+ real board games with filters for players, complexity, and playtime |
+| **📋 Game Detail Pages** | Full info, current prices, seeded deals, reviews, similar games, and play logging |
 | **📚 Collection Management** | Track owned games and wishlist with shelf view and sorting |
-| **📝 Play Logging** | Log plays with date, player count, winner, rating, and notes |
-| **📊 Stats Dashboard** | Charts for plays per month, complexity distribution, top categories, ratings |
-| **💰 Price Tracker** | Compare prices across Amazon, Target, and more with deal alert setup |
+| **📝 Play Logging** | Log plays with date, player count, winner, optional score, rating, and notes |
+| **📊 Stats Dashboard** | Charts for plays per month, complexity distribution, top categories, ratings, and recent scores |
+| **💰 Price Tracker** | Compare retailer snapshots, surface active deals, and set deal alerts |
 
 ## 🚀 Quick Start
 
@@ -34,7 +34,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — that's it! The SQLite database is created and seeded automatically with 55 real board games on first run.
+Open [http://localhost:3000](http://localhost:3000) — that's it! In non-production environments the SQLite database is created and reseeded automatically on first access with a rich demo dataset (85 board games, 12 personas, play history, reviews, collections, wishlists, price alerts, and active deals).
 
 ## 🛠 Tech Stack
 
@@ -65,9 +65,12 @@ src/
 │       ├── price-alerts/         # Deal alert subscriptions
 │       └── health/               # Service health check
 ├── components/                   # Shared UI components
-├── data/games.ts                 # 55 real board games seed data
+├── data/
+│   ├── games.ts                  # Base board game catalog data
+│   └── seed/                     # Seed catalog, personas, and deal definitions
 ├── lib/
-│   ├── db.ts                     # SQLite schema, init, seed logic
+│   ├── db.ts                     # SQLite schema, init, and migrations
+│   ├── seed.ts                   # Idempotent transactional seed orchestration
 │   ├── recommendations.ts        # Taste profile + scoring engine
 │   ├── moods.ts                  # Mood filter definitions
 │   ├── session.ts                # Opaque session token management
@@ -92,25 +95,35 @@ SQLite with the following tables:
 
 | Table | Purpose |
 | --- | --- |
-| `games` | Game catalog (55 seeded entries) |
-| `price_history` | Retailer prices per game |
-| `users` | User accounts (demo single-user MVP) |
+| `games` | Game catalog (85 seeded entries) |
+| `price_history` | Historical retailer price snapshots per game |
+| `game_deals` | Current seeded deals with discount metadata |
+| `users` | Seeded personas plus runtime-created users |
 | `sessions` | Opaque session tokens |
 | `quiz_answers` | Game ratings and preference answers |
 | `collection` | Owned/wishlist items |
-| `play_logs` | Play history with ratings |
+| `play_logs` | Play history with winners, ratings, and optional scores |
 | `reviews` | User game reviews |
 | `price_alerts` | Deal alert subscriptions |
+| `seed_metadata` | Seed dataset version tracking |
 
 ## 🎮 Seed Data
 
-The database includes 55 real board games spanning all complexity levels:
+The demo dataset is intentionally rich and deterministic:
 
-- **Heavy**: Gloomhaven, Brass: Birmingham, Spirit Island
-- **Medium-Heavy**: Terraforming Mars, Scythe, Twilight Imperium
-- **Medium**: Wingspan, 7 Wonders, Pandemic Legacy
-- **Gateway**: Catan, Ticket to Ride, Azul
-- **Light/Party**: Codenames, Coup, Love Letter
+- **85 real games** with accurate mechanics, themes, player counts, playtimes, and complexity spread from **1.0 (`No Thanks!`)** to **5.0 (`Advanced Squad Leader`)**
+- **12 user personas** with distinct tastes, collection sizes, wishlists, quiz answers, and price alerts
+- **216 seeded play logs** with dates, player counts, winners, ratings, and scores
+- **60 seeded reviews** with short, medium, and long-form text
+- **Historical price snapshots** for every retailer listing plus **active deals** for a large portion of the catalog
+- **Edge cases** including unicode names (`zoë_meeples`, `señor_carton`, `Café`, `Jórvík`) and long descriptions for heavier narrative titles
+
+### Seed Behavior
+
+- **Guarded in production** by default — automatic reseeding only runs outside production unless `GAMESCOUT_ALLOW_PRODUCTION_SEED=1`
+- **Idempotent** — the seeder truncates seed-managed tables and re-inserts a known-good dataset version
+- **Transactional** — catalog, personas, logs, reviews, and pricing data are inserted in a single transaction
+- **Conventionally placed** — catalog and persona definitions live in `src/data/seed/`, while orchestration lives in `src/lib/seed.ts`
 
 ## 📜 Available Scripts
 
@@ -118,6 +131,7 @@ The database includes 55 real board games spanning all complexity levels:
 | --- | --- |
 | `npm run dev` | Start development server with hot reload |
 | `npm run build` | Create optimized production build |
+| `GAMESCOUT_ALLOW_PRODUCTION_SEED=1 npm run start` | Allow one-time automatic seeding while running the production server |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint checks |
 | `npm run lint:types` | TypeScript type checking (`tsc --noEmit`) |

@@ -29,7 +29,8 @@ export function RecentPlaysTable({ logs }: RecentPlaysTableProps) {
               <th className="pb-3 pr-4">Date</th>
               <th className="pb-3 pr-4">Players</th>
               <th className="pb-3 pr-4">Winner</th>
-              <th className="pb-3">Rating</th>
+              <th className="pb-3 pr-4">Rating</th>
+              <th className="pb-3">Score</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
@@ -52,7 +53,7 @@ export function RecentPlaysTable({ logs }: RecentPlaysTableProps) {
                 <td className="py-3 pr-4 text-yellow-400">
                   {log.winner || "—"}
                 </td>
-                <td className="py-3">
+                <td className="py-3 pr-4">
                   {log.rating ? (
                     <span className="text-emerald-400 font-medium">
                       {log.rating}/10
@@ -60,6 +61,9 @@ export function RecentPlaysTable({ logs }: RecentPlaysTableProps) {
                   ) : (
                     <span className="text-zinc-600">—</span>
                   )}
+                </td>
+                <td className="py-3 text-sky-400">
+                  {log.score ?? "—"}
                 </td>
               </tr>
             ))}

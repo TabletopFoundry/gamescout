@@ -1,9 +1,10 @@
 "use client";
 
-import type { PriceInfo } from "@/types";
+import type { DealInfo, PriceInfo } from "@/types";
 
 interface PriceComparisonProps {
   prices: PriceInfo[];
+  deals: DealInfo[];
   showAlertForm: boolean;
   alertSet: boolean;
   alertPrice: string;
@@ -18,6 +19,7 @@ interface PriceComparisonProps {
 
 export function PriceComparison({
   prices,
+  deals,
   showAlertForm,
   alertSet,
   alertPrice,
@@ -80,6 +82,51 @@ export function PriceComparison({
               </div>
             ))}
           </div>
+
+          {deals.length > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-300">
+                Active Deals
+              </h3>
+              <div className="space-y-3">
+                {deals.map((deal) => (
+                  <div key={deal.id} className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {deal.featured === 1 && (
+                          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+                            Featured
+                          </span>
+                        )}
+                        <span className="font-medium text-white">{deal.title}</span>
+                        <span className="text-xs text-zinc-500">{deal.retailer}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Save {deal.discount_pct}% until {new Date(deal.ends_at).toLocaleDateString()}
+                        {deal.coupon_code ? ` · Code ${deal.coupon_code}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm text-zinc-500 line-through">${deal.msrp.toFixed(2)}</p>
+                        <p className="text-lg font-bold text-amber-300">${deal.sale_price.toFixed(2)}</p>
+                      </div>
+                      {deal.url && (
+                        <a
+                          href={deal.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-300"
+                        >
+                          View deal →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Deal Alert */}
           {!alertSet && !showAlertForm && (

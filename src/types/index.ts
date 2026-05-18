@@ -48,6 +48,7 @@ export interface PlayLog {
   players: number | null;
   winner: string | null;
   rating: number | null;
+  score: number | null;
   notes: string | null;
 }
 
@@ -58,6 +59,7 @@ export interface GamePlayLog {
   players: number | null;
   winner: string | null;
   rating: number | null;
+  score: number | null;
   notes: string | null;
 }
 
@@ -68,6 +70,21 @@ export interface PriceInfo {
   price: number;
   url: string;
   updated_at: string;
+}
+
+/** A retailer deal surfaced from the seeded promotions dataset. */
+export interface DealInfo {
+  id: number;
+  retailer: string;
+  title: string;
+  sale_price: number;
+  msrp: number;
+  discount_pct: number;
+  url: string | null;
+  starts_at: string;
+  ends_at: string;
+  coupon_code: string | null;
+  featured: number;
 }
 
 /** A user review for a game. */
@@ -98,6 +115,7 @@ export interface RecommendedGame {
 export interface GameDetailData {
   game: Game;
   prices: PriceInfo[];
+  deals: DealInfo[];
   reviews: Review[];
   similar: Game[];
   collectionStatus: CollectionStatus;

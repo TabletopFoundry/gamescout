@@ -278,7 +278,7 @@ export default function GameDetailPage({
     );
   }
 
-  const { game, prices, reviews, similar, playLogs, avgReview } = data;
+  const { game, prices, deals, reviews, similar, playLogs, avgReview } = data;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -317,6 +317,7 @@ export default function GameDetailPage({
 
       <PriceComparison
         prices={prices}
+        deals={deals}
         showAlertForm={showAlertForm}
         alertSet={alertSet}
         alertPrice={alertPrice}
