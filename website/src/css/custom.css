@@ -1,0 +1,49 @@
+/**
+ * GameScout brand palette: deep tabletop indigo with a warm meeple-amber accent.
+ */
+
+:root {
+  --ifm-color-primary: #d9871a;
+  --ifm-color-primary-dark: #b16e15;
+  --ifm-color-primary-darker: #a26614;
+  --ifm-color-primary-darkest: #855411;
+  --ifm-color-primary-light: #e6911e;
+  --ifm-color-primary-lighter: #f0a23a;
+  --ifm-color-primary-lightest: #f3b05c;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #f4b14a;
+  --ifm-color-primary-dark: #eea22a;
+  --ifm-color-primary-darker: #e4971e;
+  --ifm-color-primary-darkest: #bb7c19;
+  --ifm-color-primary-light: #f6c06d;
+  --ifm-color-primary-lighter: #f8ca81;
+  --ifm-color-primary-lightest: #fcdfb1;
+  --ifm-background-color: #0c0f1a;
+  --ifm-background-surface-color: #141a2c;
+  --ifm-navbar-background-color: rgba(12, 15, 26, 0.85);
+  --ifm-footer-background-color: #0a0d17;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.07);
+}
+
+html[data-theme="dark"] body {
+  background: var(--ifm-background-color);
+}
+
+.navbar {
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+article a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+article a:hover {
+  text-decoration-thickness: 2px;
+}
